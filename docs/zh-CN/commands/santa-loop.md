@@ -93,8 +93,10 @@ EOF
 
 **Codex CLI**（如果已安装）
 
+Codex 使用已配置的模型或 CLI 默认值。在 Codex 配置中设置 `model`，即可选择账号支持的评审模型。
+
 ```bash
-codex exec --sandbox read-only -m gpt-5.4 -C "$(pwd)" - < "$PROMPT_FILE"
+codex exec --sandbox read-only -C "$(pwd)" - < "$PROMPT_FILE"
 rm -f "$PROMPT_FILE"
 ```
 

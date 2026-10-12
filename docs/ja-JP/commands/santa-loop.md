@@ -89,8 +89,11 @@ EOF
 最初に利用可能なCLIを使用します：
 
 **Codex CLI**（インストールされている場合）
+
+Codexは設定されたモデル、またはCLIのデフォルトを使用します。アカウントで利用できるレビュアーモデルを選ぶには、Codex設定の `model` を指定してください。
+
 ```bash
-codex exec --sandbox read-only -m gpt-5.4 -C "$(pwd)" - < "$PROMPT_FILE"
+codex exec --sandbox read-only -C "$(pwd)" - < "$PROMPT_FILE"
 rm -f "$PROMPT_FILE"
 ```
 
