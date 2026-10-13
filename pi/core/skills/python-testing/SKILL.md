@@ -224,7 +224,7 @@ def test_without_fixture_call():
     assert Config.get_setting("debug") is False
 ```
 
-### Conftest.py for Shared Fixtures
+### Conftest.py for Shared Fixtures (Flask)
 
 ```python
 # tests/conftest.py
@@ -484,14 +484,18 @@ async def test_async_with_fixture(async_client):
     assert response.status_code == 200
 ```
 
-### Async Fixture
+### Async Fixture (FastAPI)
 
 ```python
-@pytest.fixture
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+@pytest_asyncio.fixture
 async def async_client():
     """Async fixture providing async test client."""
-    app = create_app()
-    async with app.test_client() as client:
+    app = create_app()  # Returns a FastAPI application
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
 @pytest.mark.asyncio
@@ -661,7 +665,7 @@ class TestUserService:
 
 ## Common Patterns
 
-### Testing API Endpoints (FastAPI/Flask)
+### Testing API Endpoints (Flask)
 
 ```python
 @pytest.fixture
