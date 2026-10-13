@@ -85,7 +85,7 @@ function detectPatterns(skillRuns, options = {}) {
     }
 
     const sortedRuns = [...group.runs].sort(
-      (a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')
+      (a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0)
     );
 
     const firstSeen = sortedRuns[sortedRuns.length - 1].createdAt || null;
@@ -112,7 +112,7 @@ function detectPatterns(skillRuns, options = {}) {
   // Sort by count descending, then by lastSeen descending
   return patterns.sort((a, b) => {
     if (b.count !== a.count) return b.count - a.count;
-    return (b.lastSeen || '').localeCompare(a.lastSeen || '');
+    return (Date.parse(b.lastSeen) || 0) - (Date.parse(a.lastSeen) || 0);
   });
 }
 

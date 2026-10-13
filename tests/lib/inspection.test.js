@@ -212,6 +212,26 @@ async function runTests() {
     assert.strictEqual(patterns[0].runIds.length, 3);
   })) passed += 1; else failed += 1;
 
+  if (await test('detectPatterns orders ISO timestamps by their actual instants', async () => {
+    const older = '2026-03-15T04:00:00+04:00';
+    const newer = '2026-03-15T01:00:00Z';
+    const runs = [
+      makeSkillRun({ id: 'old', skillId: 'alpha', failureReason: 'error', createdAt: older }),
+      makeSkillRun({ id: 'new', skillId: 'alpha', failureReason: 'error', createdAt: newer }),
+      makeSkillRun({ id: 'b1', skillId: 'beta', failureReason: 'error', createdAt: '2026-03-15T10:15:00+10:00' }),
+      makeSkillRun({ id: 'b2', skillId: 'beta', failureReason: 'error', createdAt: '2026-03-15T10:30:00+10:00' }),
+      { ...makeSkillRun({ id: 'g1', skillId: 'gamma', failureReason: 'error' }), createdAt: null },
+      { ...makeSkillRun({ id: 'g2', skillId: 'gamma', failureReason: 'error' }), createdAt: null },
+    ];
+    const patterns = detectPatterns(runs, { threshold: 2 });
+    assert.deepStrictEqual(patterns.map(pattern => pattern.skillId), ['alpha', 'beta', 'gamma']);
+    assert.strictEqual(patterns[0].firstSeen, older);
+    assert.strictEqual(patterns[0].lastSeen, newer);
+    assert.deepStrictEqual(patterns[0].runIds, ['new', 'old']);
+    assert.strictEqual(patterns[2].firstSeen, null);
+    assert.strictEqual(patterns[2].lastSeen, null);
+  })) passed += 1; else failed += 1;
+
   if (await test('detectPatterns uses default threshold', async () => {
     const runs = Array.from({ length: DEFAULT_FAILURE_THRESHOLD }, (_, i) =>
       makeSkillRun({ id: `r${i}`, failureReason: 'permission denied' })
