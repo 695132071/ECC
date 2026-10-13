@@ -85,6 +85,8 @@ def _parse_classification(text: str) -> dict[str, list[int]]:
                 raise ClassifierParseError(
                     f"classifier returned non-list JSON value: {type(value).__name__}"
                 )
+            if any(isinstance(i, bool) or (isinstance(i, float) and not i.is_integer()) for i in value):
+                raise ValueError("tool call indices must be whole numbers, not booleans")
         return {k: [int(i) for i in v] for k, v in parsed.items()}
     except (json.JSONDecodeError, ValueError, TypeError, OverflowError) as e:
         raise ClassifierParseError(
