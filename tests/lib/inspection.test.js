@@ -58,9 +58,15 @@ async function runTests() {
   })) passed += 1; else failed += 1;
 
   if (await test('normalizeFailureReason strips file paths', async () => {
-    const normalized = normalizeFailureReason('File not found: /usr/local/bin/node');
-    assert.ok(!normalized.includes('/usr/local'));
-    assert.ok(normalized.includes('<path>'));
+    for (const reason of [
+      'File not found: /usr/local/bin/node',
+      String.raw`File not found: C:\project-a\src\one.js`,
+      'File not found: D:/project-b/src/two.js',
+      String.raw`File not found: \\server\share\three.js`,
+    ]) {
+      assert.strictEqual(normalizeFailureReason(reason), 'file not found: <path>');
+    }
+    assert.strictEqual(normalizeFailureReason('Request failed: https://example.com/test'), 'request failed: https:<path>');
   })) passed += 1; else failed += 1;
 
   if (await test('normalizeFailureReason handles null and empty values', async () => {
@@ -169,6 +175,19 @@ async function runTests() {
     assert.strictEqual(patterns.length, 1);
     assert.ok(patterns[0].normalizedReason.includes('<timestamp>'));
     assert.ok(patterns[0].normalizedReason.includes('<path>'));
+  })) passed += 1; else failed += 1;
+
+  if (await test('detectPatterns groups failures from different Windows paths', async () => {
+    const runs = [
+      makeSkillRun({ id: 'r1', failureReason: String.raw`File not found: C:\project-a\one.js` }),
+      makeSkillRun({ id: 'r2', failureReason: 'File not found: D:/project-b/two.js' }),
+      makeSkillRun({ id: 'r3', failureReason: String.raw`File not found: E:\project-c\three.js` }),
+    ];
+    const patterns = detectPatterns(runs);
+    assert.strictEqual(patterns.length, 1);
+    assert.strictEqual(patterns[0].count, 3);
+    assert.strictEqual(patterns[0].normalizedReason, 'file not found: <path>');
+    assert.strictEqual(generateReport(patterns).status, 'attention_needed');
   })) passed += 1; else failed += 1;
 
   if (await test('detectPatterns tracks unique session IDs and versions', async () => {

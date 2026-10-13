@@ -22,7 +22,7 @@ function normalizeFailureReason(reason) {
     // Strip UUIDs (already lowercased)
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<uuid>')
     // Strip file paths
-    .replace(/\/[\w./-]+/g, '<path>')
+    .replace(/(?:\b[a-z]:)?[\\/][\w./\\-]+/g, '<path>')
     // Collapse whitespace
     .replace(/\s+/g, ' ')
     .trim();
