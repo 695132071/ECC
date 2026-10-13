@@ -141,6 +141,19 @@ function runTests() {
     assert.ok(result.error.includes('empty'));
   })) passed++; else failed++;
 
+  if (test('rejects invalid titles without corrupting an existing alias', () => {
+    resetAliases();
+    aliases.setAlias('keep', '/path/to/session', 'Original title');
+    const before = fs.readFileSync(aliases.getAliasesPath(), 'utf8');
+    for (const title of [42, 0, false, {}, []]) {
+      const result = aliases.setAlias('keep', '/different/path', title);
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.error, 'Title must be a string or null');
+      assert.strictEqual(fs.readFileSync(aliases.getAliasesPath(), 'utf8'), before);
+    }
+    assert.deepStrictEqual(aliases.listAliases({ search: 'zzz' }), []);
+  })) passed++; else failed++;
+
   if (test('accepts underscores and dashes in alias', () => {
     resetAliases();
     const result = aliases.setAlias('my_session-v2', '/path');
@@ -1287,21 +1300,14 @@ function runTests() {
       'Alias should no longer exist after removal');
   })) passed++; else failed++;
 
-  // ── Round 102: setAlias with title=0 (falsy number coercion) ──
-  console.log('\nRound 102: setAlias (title=0 — falsy coercion silently converts to null):');
-  if (test('setAlias with title=0 stores null (0 || null === null due to JavaScript falsy coercion)', () => {
-    // session-aliases.js line 221: `title: title || null` — the value 0 is falsy
-    // in JavaScript, so `0 || null` evaluates to `null`.  This means numeric
-    // titles like 0 are silently discarded.
+  // ── Round 102: setAlias with title=0 (invalid title type) ──
+  console.log('\nRound 102: setAlias (title=0 is rejected):');
+  if (test('setAlias rejects a zero numeric title instead of silently storing null', () => {
     resetAliases();
     const result = aliases.setAlias('zero-title', '/sessions/test', 0);
-    assert.strictEqual(result.success, true,
-      'setAlias should succeed (0 is valid as a truthy check bypass)');
-    assert.strictEqual(result.title, null,
-      'Title should be null because 0 || null === null (falsy coercion)');
-    const resolved = aliases.resolveAlias('zero-title');
-    assert.strictEqual(resolved.title, null,
-      'Persisted title should be null after round-trip through saveAliases/loadAliases');
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.error, 'Title must be a string or null');
+    assert.strictEqual(aliases.resolveAlias('zero-title'), null);
   })) passed++; else failed++;
 
   // ── Round 103: loadAliases with array aliases in JSON (typeof [] === 'object' bypass) ──

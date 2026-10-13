@@ -215,6 +215,10 @@ function setAliasUnlocked(alias, sessionPath, title = null) {
     return { success: false, error: 'Session path cannot be empty' };
   }
 
+  if (title !== null && typeof title !== 'string') {
+    return { success: false, error: 'Title must be a string or null' };
+  }
+
   if (alias.length > 128) {
     return { success: false, error: 'Alias name cannot exceed 128 characters' };
   }
