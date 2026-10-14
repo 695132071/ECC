@@ -89,8 +89,11 @@ function main() {
 
   // Load skill (always inject — now only ~50 lines)
   // The host does not expand ${CLAUDE_SKILL_DIR} in hook output, so fill it in here.
+  // SKILL.md uses it inside double-quoted bash, so escape the characters bash
+  // still interprets there; the callback keeps `$&` etc. in the path literal.
+  const shellSkillDir = SKILL_DIR.replace(/[\\$`"]/g, '\\$&');
   const skill = existsSync(SKILL_FILE)
-    ? readFileSync(SKILL_FILE, 'utf8').replaceAll('${CLAUDE_SKILL_DIR}', SKILL_DIR)
+    ? readFileSync(SKILL_FILE, 'utf8').replaceAll('${CLAUDE_SKILL_DIR}', () => shellSkillDir)
     : '';
 
   const projects = readJson(PROJECTS_FILE) || {};

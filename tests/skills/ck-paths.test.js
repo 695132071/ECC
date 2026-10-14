@@ -78,7 +78,31 @@ async function runTests() {
       const { additionalContext } = JSON.parse(result.stdout);
       assert.ok(additionalContext.includes('# ck — Context Keeper'), 'SKILL.md was not injected');
       assert.ok(!additionalContext.includes('${CLAUDE_SKILL_DIR}'), 'skill dir placeholder left unexpanded');
-      assert.ok(additionalContext.includes(path.join(SKILL_DIR, 'commands')), 'skill dir not substituted');
+      // Escaped for double-quoted bash (Windows backslashes are doubled).
+      const shellCommandsDir = path.join(SKILL_DIR, 'commands').replace(/[\\$`"]/g, '\\$&');
+      assert.ok(additionalContext.includes(shellCommandsDir), 'skill dir not substituted');
+    } finally {
+      fs.rmSync(ctx.root, { recursive: true, force: true });
+    }
+  })) passed++; else failed++;
+
+  if (process.platform === 'win32') {
+    console.log('  - skipped shell-special skill dir test on Windows');
+  } else if (await test('hook-injected commands run from a skill dir with shell-special characters', async () => {
+    const ctx = tempEnv();
+    try {
+      const skillDir = path.join(ctx.root, 'skills $USER $& `x` "q"', 'ck');
+      fs.cpSync(SKILL_DIR, skillDir, { recursive: true });
+      const result = spawnSync(process.execPath, [path.join(skillDir, 'hooks', 'session-start.mjs')], {
+        cwd: ctx.project, env: ctx.env, input: '{}', encoding: 'utf8',
+      });
+      assert.strictEqual(result.status, 0, result.stderr);
+      const { additionalContext } = JSON.parse(result.stdout);
+      const listCommand = additionalContext.split('\n').find(line => line.includes('commands/list.mjs'));
+      assert.ok(listCommand, 'no list.mjs command injected');
+      const list = spawnSync('bash', ['-c', listCommand], { cwd: ctx.project, env: ctx.env, encoding: 'utf8' });
+      // No projects are registered, so list.mjs reaching its own message proves the path resolved.
+      assert.ok(list.stdout.includes('No projects registered'), `${listCommand}\n${list.stdout}${list.stderr}`);
     } finally {
       fs.rmSync(ctx.root, { recursive: true, force: true });
     }
