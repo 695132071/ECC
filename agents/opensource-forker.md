@@ -150,7 +150,12 @@ git commit -m "Initial open-source release
 
 Forked from private source. All secrets stripped, internal references
 replaced with configurable placeholders. See .env.example for configuration."
+printf '%s\n' FORK_REPORT.md SANITIZATION_REPORT.md >> .git/info/exclude
 ```
+
+This commit is provisional. The pipeline amends it after sanitizer fixes and packaging, so the
+published history stays one commit (see the opensource-pipeline skill, Step 3). The reports never
+go into it: `.git/info/exclude` keeps them out of `git add -A`.
 
 ### Step 7: Generate Fork Report
 

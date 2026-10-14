@@ -82,6 +82,23 @@ Follow the full forking protocol:
 
 Wait for completion. Read `{STAGING_PATH}/FORK_REPORT.md`.
 
+The forker's single commit is only the starting point: `gh repo create --push` (Step 7)
+publishes commits, not the working tree. Every later change (sanitizer fixes, packager output)
+must be folded into that commit, so the public history is one commit that matches the tree the
+sanitizer passed. The reports stay out of it. Fold changes in with:
+
+```bash
+cd "{STAGING_PATH}"
+grep -qxF SANITIZATION_REPORT.md .git/info/exclude || printf '%s\n' FORK_REPORT.md SANITIZATION_REPORT.md >> .git/info/exclude
+git add -A
+git commit --amend --no-edit
+git status --porcelain        # must print nothing
+git rev-list --count HEAD     # must print 1
+```
+
+An amend leaves a secret that was removed from a file out of the new commit. A new commit on top
+would publish it in history.
+
 #### Step 4: Run Sanitizer Agent
 
 Spawn the `opensource-sanitizer` agent:
@@ -113,7 +130,7 @@ Generate SANITIZATION_REPORT.md inside {STAGING_PATH}/ with PASS/FAIL verdict.
 Wait for completion. Read `{STAGING_PATH}/SANITIZATION_REPORT.md`.
 
 **If FAIL:** Show findings to user. Ask: "Fix these and re-scan, or abort?"
-- If fix: Apply fixes, re-run sanitizer (maximum 3 retry attempts — after 3 FAILs, present all findings and ask user to fix manually)
+- If fix: Apply fixes, fold them into the commit (see Step 3), re-run sanitizer (maximum 3 retry attempts — after 3 FAILs, present all findings and ask user to fix manually)
 - If abort: Clean up staging directory
 
 **Unreadable files.** After the fix/rescan loop settles, read the report's `## Unreadable Files`
@@ -168,6 +185,13 @@ Generate:
 )
 ```
 
+#### Step 5b: Commit the Packaging and Re-Verify
+
+The packager's files are not committed yet. Fold them into the commit (see Step 3), then run the
+sanitizer again exactly as in Step 4, against what will be published. Apply the same gate as
+Step 4, including the fix loop and the unreadable-files check. A FAIL here stops the pipeline:
+packaging can add a personal email, a home path or a key in an example.
+
 #### Step 6: Final Review
 
 Present to user:
@@ -184,7 +208,7 @@ Files generated:
   - CONTRIBUTING.md
   - .env.example ({N} variables)
 
-Sanitization: {sanitization_verdict}
+Sanitization: {sanitization_verdict} (scanned after packaging, on the commit that will be pushed)
 
 Next steps:
   1. Review: cd {STAGING_PATH}
@@ -196,8 +220,13 @@ Proceed with GitHub creation? (yes/no/review first)
 
 #### Step 7: GitHub Publish (on user approval)
 
+Push only the commit the sanitizer passed. If the tree changed since Step 5b (for example the user
+edited files after "review first"), go back to Step 5b instead of pushing.
+
 ```bash
 cd "{STAGING_PATH}"
+test -z "$(git status --porcelain)" && test "$(git rev-list --count HEAD)" = 1 \
+  || { echo "Uncommitted changes or extra commits: return to Step 5b" >&2; exit 1; }
 gh repo create "{github_org}/{github_repo}" --public --source=. --push --description "{description}"
 ```
 
@@ -270,13 +299,14 @@ $HOME/opensource-staging/
 - **Never** push to GitHub without user approval
 - **Never** skip the sanitizer — it is the safety gate
 - **Never** proceed after a sanitizer FAIL without fixing all critical findings
+- **Never** push with uncommitted changes or more than one commit: the push sends commits, so unfolded fixes are not published and the original secret is
 - **Never** leave `.env`, `*.pem`, or `credentials.json` in the staging directory
 
 ## Best Practices
 
 - Always run the full pipeline (fork → sanitize → package) for new releases
 - The staging directory persists until explicitly cleaned up — use it for review
-- Re-run the sanitizer after any manual fixes before publishing
+- After any manual fix, fold it into the single commit and re-run the sanitizer before publishing
 - Parameterize secrets rather than deleting them — preserve project functionality
 
 ## Related Skills
