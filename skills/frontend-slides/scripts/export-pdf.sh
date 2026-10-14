@@ -82,10 +82,10 @@ else
     OUTPUT_PDF="$(dirname "$INPUT_HTML")/$(basename "$INPUT_HTML" .html).pdf"
 fi
 
-# Resolve output to absolute path
+# Resolve output to absolute path (the export later runs from a temp dir that is deleted)
 OUTPUT_DIR=$(dirname "$OUTPUT_PDF")
 mkdir -p "$OUTPUT_DIR"
-OUTPUT_PDF="$OUTPUT_DIR/$(basename "$OUTPUT_PDF")"
+OUTPUT_PDF="$(cd "$OUTPUT_DIR" && pwd)/$(basename "$OUTPUT_PDF")"
 
 echo ""
 echo -e "${BOLD}========================================${NC}"
