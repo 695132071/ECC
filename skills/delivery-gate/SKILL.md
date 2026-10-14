@@ -26,7 +26,7 @@ This is the same pattern as CI pipeline gates — automated, deterministic check
 | Disk space < 30GB | `shutil.disk_usage` | Warning |
 | Disk space < 15GB | `shutil.disk_usage` | **Block** (exit 2), on every Stop |
 
-Rationalization detection warns about patterns like "skip tests for now" and "pre-existing bug" — surface signals that thinking may have been cut short. It never blocks on its own, because regex heuristics can false-positive. The blocking conditions are: disk critical (any session), or, on a complex task (>=3 Edit/Write calls), `>=3 learning libs stale` OR `growth-log` specifically stale.
+Rationalization detection warns about patterns like "skip tests for now" and "pre-existing bug" — surface signals that thinking may have been cut short. It never blocks on its own, because regex heuristics can false-positive. The blocking conditions are: disk critical (any session), or, on a complex task (>=3 Edit/Write calls), `>=3 learning libs stale` OR `growth-log` specifically stale. If the project memory directory does not exist, the learning-library checks are skipped: the hook only warns that it cannot verify learning capture, and a complex task is not blocked (the disk checks still apply).
 
 The hook blocks a given Stop at most once. When Claude Code re-runs it with `stop_hook_active: true` (Claude already continued once because of this hook), it exits 0, so a condition the agent cannot fix (such as low disk space) cannot trap the session in an endless loop.
 
@@ -114,7 +114,7 @@ stderr: "Blocked: disk space at 12GB (<15GB). Free space before continuing."
 
 ## Limitations
 
-The hook enforces the **habit** of touching learning libraries, not the **quality** of what was recorded. On a complex task it passes only when `growth-log` was updated today and at most 2 libraries are stale; updating `output-index.md` alone still blocks. This is by design: mechanical gates check machine-verifiable facts. For content quality verification, pair with `self-audit`.
+The hook enforces the **habit** of touching learning libraries, not the **quality** of what was recorded. On a complex task it passes only when `growth-log` was updated today and at most 2 libraries are stale; updating `output-index.md` alone still blocks. Without a project memory directory there is nothing to check, so it only warns. This is by design: mechanical gates check machine-verifiable facts. For content quality verification, pair with `self-audit`.
 
 ## Compatibility
 
