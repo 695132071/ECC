@@ -28,6 +28,31 @@ function test(name, fn) {
   }
 }
 
+function withStubbedExport(htmlRelPath, fn) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slides-export-'));
+  try {
+    const bin = path.join(root, 'bin');
+    const work = path.join(root, 'work');
+    fs.mkdirSync(bin);
+    fs.mkdirSync(path.dirname(path.join(work, htmlRelPath)), { recursive: true });
+    // npm/npx succeed without doing anything; open/xdg-open must not launch a viewer.
+    for (const name of ['npm', 'npx', 'open', 'xdg-open']) {
+      fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    }
+    // node stub checks the served HTML exists, then writes the PDF to the output path argument.
+    fs.writeFileSync(path.join(bin, 'node'), '#!/bin/sh\n[ -f "$2/$3" ] || exit 3\nprintf "%%PDF-stub" > "$4"\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(work, htmlRelPath), '<html></html>\n');
+    const run = (args, extraEnv = {}) => spawnSync('bash', [SCRIPT, ...args], {
+      cwd: work,
+      encoding: 'utf8',
+      env: { ...process.env, ...extraEnv, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+    });
+    fn({ work, run });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
 function runTests() {
   console.log('\n=== Testing frontend-slides export-pdf.sh ===\n');
 
@@ -42,31 +67,19 @@ function runTests() {
   let failed = 0;
 
   if (test('writes a relative output path next to the caller, not into the deleted temp dir', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slides-export-'));
-    try {
-      const bin = path.join(root, 'bin');
-      const work = path.join(root, 'work');
-      fs.mkdirSync(bin);
-      fs.mkdirSync(work);
-      // npm/npx succeed without doing anything; open/xdg-open must not launch a viewer.
-      for (const name of ['npm', 'npx', 'open', 'xdg-open']) {
-        fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-      }
-      // node stub writes the PDF to the output path argument, resolved against its cwd.
-      fs.writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nprintf "%%PDF-stub" > "$4"\n', { mode: 0o755 });
-      fs.writeFileSync(path.join(work, 'presentation.html'), '<html></html>\n');
-
-      const result = spawnSync('bash', [SCRIPT, './presentation.html', './slides.pdf'], {
-        cwd: work,
-        encoding: 'utf8',
-        env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
-      });
-
+    withStubbedExport('presentation.html', ({ work, run }) => {
+      const result = run(['./presentation.html', './slides.pdf']);
       assert.strictEqual(result.status, 0, result.stdout + result.stderr);
       assert.ok(fs.existsSync(path.join(work, 'slides.pdf')), 'slides.pdf was not written to the working directory');
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
+    });
+  })) passed++; else failed++;
+
+  if (test('resolves nested relative input and output paths when CDPATH is exported', () => {
+    withStubbedExport(path.join('decks', 'presentation.html'), ({ work, run }) => {
+      const result = run(['decks/presentation.html', 'exports/slides.pdf'], { CDPATH: '.' });
+      assert.strictEqual(result.status, 0, result.stdout + result.stderr);
+      assert.ok(fs.existsSync(path.join(work, 'exports', 'slides.pdf')), 'exports/slides.pdf was not written');
+    });
   })) passed++; else failed++;
 
   console.log(`\nPassed: ${passed}`);
