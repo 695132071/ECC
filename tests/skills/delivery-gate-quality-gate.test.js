@@ -22,8 +22,10 @@ function findPython() {
     { command: 'py', args: ['-3'] },
   ].filter(candidate => candidate.command);
 
+  // Probe for Python 3 itself: a Python 2 `--version` also exits 0, but the
+  // driver below needs importlib.util.
   for (const candidate of candidates) {
-    const result = spawnSync(candidate.command, [...candidate.args, '--version'], {
+    const result = spawnSync(candidate.command, [...candidate.args, '-c', 'import sys; sys.exit(sys.version_info[0] != 3)'], {
       encoding: 'utf8',
       timeout: 5000,
     });
