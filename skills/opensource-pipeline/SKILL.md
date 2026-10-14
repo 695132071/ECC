@@ -192,6 +192,12 @@ sanitizer again exactly as in Step 4, against what will be published. Apply the 
 Step 4, including the fix loop and the unreadable-files check. A FAIL here stops the pipeline:
 packaging can add a personal email, a home path or a key in an example.
 
+When the gate passes, record the commit the sanitizer scanned as `{SCANNED_COMMIT}`:
+
+```bash
+git -C "{STAGING_PATH}" rev-parse HEAD
+```
+
 #### Step 6: Final Review
 
 Present to user:
@@ -220,13 +226,15 @@ Proceed with GitHub creation? (yes/no/review first)
 
 #### Step 7: GitHub Publish (on user approval)
 
-Push only the commit the sanitizer passed. If the tree changed since Step 5b (for example the user
-edited files after "review first"), go back to Step 5b instead of pushing.
+Push only the commit the sanitizer passed. If the tree or the commit changed since Step 5b (for
+example the user edited files after "review first" and amended), go back to Step 5b instead of
+pushing.
 
 ```bash
 cd "{STAGING_PATH}"
 test -z "$(git status --porcelain)" && test "$(git rev-list --count HEAD)" = 1 \
-  || { echo "Uncommitted changes or extra commits: return to Step 5b" >&2; exit 1; }
+  && test "$(git rev-parse HEAD)" = "{SCANNED_COMMIT}" \
+  || { echo "Uncommitted changes, extra commits, or HEAD is not the scanned commit: return to Step 5b" >&2; exit 1; }
 gh repo create "{github_org}/{github_repo}" --public --source=. --push --description "{description}"
 ```
 
