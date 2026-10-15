@@ -40,8 +40,7 @@ function runCodexExample(commandPath, configuredModel) {
   try {
     const promptFile = path.join(tempRoot, 'prompt.md');
     fs.writeFileSync(promptFile, 'Independent review only.');
-    fs.writeFileSync(path.join(tempRoot, 'codex'), `#!${process.execPath}
-const fs = require('fs');
+    fs.writeFileSync(path.join(tempRoot, 'codex.js'), `const fs = require('fs');
 const args = process.argv.slice(2);
 const modelFlag = args.findIndex(arg => arg === '-m' || arg === '--model');
 const model = modelFlag < 0 ? process.env.ECC_TEST_CONFIGURED_MODEL : args[modelFlag + 1];
@@ -50,11 +49,13 @@ if (model !== process.env.ECC_TEST_CONFIGURED_MODEL) {
   process.exit(1);
 }
 console.log(JSON.stringify({ args, model, prompt: fs.readFileSync(0, 'utf8') }));
-`, { mode: 0o755 });
-    const result = spawnSync('bash', ['-c', invocation[0]], {
+`);
+    fs.writeFileSync(path.join(tempRoot, 'codex'), '#!/bin/sh\nexec "$ECC_TEST_NODE" "$0.js" "$@"\n', { mode: 0o755 });
+    // Ignore exported functions and startup scripts so CLI dispatch stays inside the fixture.
+    const result = spawnSync('bash', ['-p', '-c', invocation[0]], {
       cwd: tempRoot,
       env: { ...process.env, PATH: `${tempRoot}${path.delimiter}${process.env.PATH}`,
-        PROMPT_FILE: promptFile, ECC_TEST_CONFIGURED_MODEL: configuredModel },
+        PROMPT_FILE: promptFile, ECC_TEST_CONFIGURED_MODEL: configuredModel, ECC_TEST_NODE: process.execPath },
       encoding: 'utf8', timeout: 10000,
     });
     assert.strictEqual(result.status, 0, result.stderr);
@@ -67,6 +68,10 @@ console.log(JSON.stringify({ args, model, prompt: fs.readFileSync(0, 'utf8') }))
 console.log('\n=== Testing Santa Loop Codex model selection (stub CLI) ===\n');
 
 for (const commandPath of commands) {
+  test(`${commandPath} has no obsolete fixed-model promise`, () => {
+    const source = fs.readFileSync(path.join(repoRoot, commandPath), 'utf8');
+    assert.ok(!/gpt-5\.4/i.test(source), 'Codex model selection must agree throughout the command');
+  });
   for (const model of ['account-default', 'configured-review-model']) {
     test(`${commandPath} respects ${model} and preserves review inputs`, () => {
       const result = runCodexExample(commandPath, model);
