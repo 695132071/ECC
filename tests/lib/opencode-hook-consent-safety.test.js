@@ -248,6 +248,20 @@ function runTests() {
       assert.strictEqual(fs.readFileSync(destination, 'utf8'), '{ malformed');
       assert.deepStrictEqual(fs.readFileSync(value.installStatePath), before);
     }));
+    test(`${mode} reports a non-array plugin with source context`, () => fixture(value => {
+      const destination = path.join(value.targetRoot, 'opencode.json');
+      fs.writeFileSync(destination, '{"plugin":"./plugins"}');
+      const before = fs.readFileSync(value.installStatePath);
+      if (mode === 'apply') assert.throws(() => applyInstallPlan(value.declinePlan), /Invalid .*opencode\.json: plugin must be an array/);
+      else if (mode === 'repair') assert.match(repair(value).results[0].error, /plugin must be an array/);
+      else {
+        const result = buildDoctorReport({ repoRoot: value.sourceRoot, homeDir: value.homeDir,
+          projectRoot: value.homeDir, targets: ['opencode'] }).results[0];
+        assert.match(JSON.stringify(result.issues), /plugin must be an array/);
+      }
+      assert.strictEqual(fs.readFileSync(destination, 'utf8'), '{"plugin":"./plugins"}');
+      assert.deepStrictEqual(fs.readFileSync(value.installStatePath), before);
+    }));
   }
   test('apply rejects another enabled writer and repair while holding its target lease', () => fixture(value => {
     let checked = false;
@@ -327,6 +341,16 @@ function runTests() {
       assert.deepStrictEqual(config.plugin, ['ecc-universal']);
       assert.strictEqual(config.endpoint, 'https://example.com/path');
       assert.strictEqual(config.block, '/* not a comment */');
+    });
+    test('parseJsoncConfig rejects an unterminated block comment with source context', () => {
+      assert.throws(
+        () => parseJsoncConfig('{"plugin":[]} /* unfinished', 'opencode.json'),
+        /Failed to parse opencode\.json: Unterminated block comment/,
+      );
+    });
+    test('parseJsoncConfig stops line comments at CR-only line endings', () => {
+      const config = parseJsoncConfig('{"plugin":[] // note\r}', 'opencode.json');
+      assert.deepStrictEqual(config.plugin, []);
     });
     test(`fresh ${consent || 'default'} apply preserves inactive JSONC user config with comments`, () => fixture(value => {
       fs.unlinkSync(value.installStatePath);

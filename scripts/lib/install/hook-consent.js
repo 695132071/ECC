@@ -65,6 +65,10 @@ function parseJsoncConfig(content, sourceRelativePath) {
   return config;
 }
 
+function isLineBreak(ch) {
+  return ch === '\n' || ch === '\r';
+}
+
 /**
  * Advance past whitespace and // or /* *\/ comments; returns the index of
  * the next significant character.
@@ -74,12 +78,13 @@ function skipJsoncTrivia(input, start) {
   for (;;) {
     while (j < input.length && /\s/.test(input[j])) j += 1;
     if (input[j] === '/' && input[j + 1] === '/') {
-      while (j < input.length && input[j] !== '\n') j += 1;
+      while (j < input.length && !isLineBreak(input[j])) j += 1;
       continue;
     }
     if (input[j] === '/' && input[j + 1] === '*') {
       j += 2;
       while (j < input.length && !(input[j] === '*' && input[j + 1] === '/')) j += 1;
+      if (j >= input.length) throw new Error('Unterminated block comment');
       j += 2;
       continue;
     }
@@ -110,13 +115,14 @@ function stripJsonc(input) {
       continue;
     }
     if (ch === '/' && input[i + 1] === '/') {
-      while (i < input.length && input[i] !== '\n') i += 1;
+      while (i < input.length && !isLineBreak(input[i])) i += 1;
       out += '\n';
       continue;
     }
     if (ch === '/' && input[i + 1] === '*') {
       i += 2;
       while (i < input.length && !(input[i] === '*' && input[i + 1] === '/')) i += 1;
+      if (i >= input.length) throw new Error('Unterminated block comment');
       i += 1; // consume the closing '/'
       out += ' ';
       continue;

@@ -451,9 +451,16 @@ function activationIsInactive(kind, operation, content) {
     return content.toString('utf8') === getDisabledOpenCodePluginContent();
   }
   const text = content.toString('utf8');
+  const relativePath = operation.sourceRelativePath || operation.destinationPath;
   // JSONC-tolerant parse so a comment in the user's config does not crash
   // the install; the ownership guard never writes this file (issue #3546).
-  const config = parseJsoncConfig(text, operation.sourceRelativePath || operation.destinationPath);
+  const config = parseJsoncConfig(text, relativePath);
+  // Keep the same shape error the strict parser surfaced via
+  // disableOpenCodeHookPluginRegistration: a non-array plugin must not
+  // silently count as inactive.
+  if (config.plugin !== undefined && !Array.isArray(config.plugin)) {
+    throw new Error(`Invalid ${relativePath}: plugin must be an array`);
+  }
   return !Array.isArray(config.plugin) || !config.plugin.includes('./plugins');
 }
 
