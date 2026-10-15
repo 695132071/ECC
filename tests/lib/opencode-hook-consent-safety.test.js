@@ -9,7 +9,7 @@ const { createFileSystemLoader } = require('./helpers/load-with-file-system');
 const fileSystem = { ...fs };
 const load = createFileSystemLoader(fileSystem);
 const { applyInstallPlan } = load(require.resolve('../../scripts/lib/install/apply'));
-const { withHookConsent } = require('../../scripts/lib/install/hook-consent');
+const { parseJsoncConfig, withHookConsent } = require('../../scripts/lib/install/hook-consent');
 const { createInstallState, readInstallState, writeInstallState } = require('../../scripts/lib/install-state');
 const { buildDoctorReport, repairInstalledStates } = load(require.resolve('../../scripts/lib/install-lifecycle'));
 
@@ -314,6 +314,43 @@ function runTests() {
         assert.strictEqual(fs.existsSync(`${value.installStatePath}.ecc.lock`), false);
       }));
     }
+    test('parseJsoncConfig tolerates comments and trailing commas without touching strings', () => {
+      const config = parseJsoncConfig(`{
+  // my note
+  "plugin": [
+    "ecc-universal", /* inline */
+  ],
+  "endpoint": "https://example.com/path", // URL survives
+  "block": "/* not a comment */",
+}
+`, 'opencode.json');
+      assert.deepStrictEqual(config.plugin, ['ecc-universal']);
+      assert.strictEqual(config.endpoint, 'https://example.com/path');
+      assert.strictEqual(config.block, '/* not a comment */');
+    });
+    test(`fresh ${consent || 'default'} apply preserves inactive JSONC user config with comments`, () => fixture(value => {
+      fs.unlinkSync(value.installStatePath);
+      fs.unlinkSync(path.join(value.targetRoot, 'plugins/ecc-hooks.ts'));
+      const destination = path.join(value.targetRoot, 'opencode.json');
+      // JSONC with a line comment, a block comment, trailing commas and a
+      // URL string: OpenCode accepts this; the installer must not crash on
+      // the read-only membership check (issue #3546).
+      const content = `{
+  // my note
+  "plugin": [
+    "ecc-universal",
+  ],
+  "endpoint": "https://example.com/path", /* keep */
+}
+`;
+      fs.writeFileSync(destination, content);
+      const result = applyInstallPlan(withHookConsent(value.basePlan, consent));
+      assert.strictEqual(result.applied, true);
+      assert.strictEqual(fs.readFileSync(destination, 'utf8'), content);
+      assert.ok(result.warnings.some(warning => warning.includes(`Skipped user-owned file ${destination}`)));
+      assert.ok(result.skippedOperations.some(operation => operation.destinationPath === destination));
+      assert.strictEqual(fs.existsSync(`${value.installStatePath}.ecc.lock`), false);
+    }));
     test(`fresh ${consent || 'default'} apply still refuses active unrecorded config`, () => fixture(value => {
       fs.unlinkSync(value.installStatePath);
       fs.unlinkSync(path.join(value.targetRoot, 'plugins/ecc-hooks.ts'));

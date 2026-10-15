@@ -11,7 +11,7 @@ const {
 const { readInstallState, writeInstallState } = require('../install-state');
 const {
   assertHookConsentReady,
-  disableOpenCodeHookPluginRegistration,
+  parseJsoncConfig,
   getDisabledOpenCodePluginContent,
   getRecordedHookConsent,
   getOpenCodeActivationPathKind,
@@ -451,9 +451,9 @@ function activationIsInactive(kind, operation, content) {
     return content.toString('utf8') === getDisabledOpenCodePluginContent();
   }
   const text = content.toString('utf8');
-  // Validate first so malformed JSON retains its source context.
-  disableOpenCodeHookPluginRegistration(text, operation.sourceRelativePath || operation.destinationPath);
-  const config = JSON.parse(text);
+  // JSONC-tolerant parse so a comment in the user's config does not crash
+  // the install; the ownership guard never writes this file (issue #3546).
+  const config = parseJsoncConfig(text, operation.sourceRelativePath || operation.destinationPath);
   return !Array.isArray(config.plugin) || !config.plugin.includes('./plugins');
 }
 
