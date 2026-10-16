@@ -232,6 +232,36 @@ async function runTests() {
     assert.strictEqual(patterns[2].lastSeen, null);
   })) passed += 1; else failed += 1;
 
+  if (await test('detectPatterns keeps undated runs and patterns stable after dated ones', async () => {
+    const historical = '1969-12-31T23:59:59Z';
+    const epoch = '1970-01-01T00:00:00Z';
+    const runs = [
+      { ...makeSkillRun({ id: 'missing-a' }), createdAt: null },
+      makeSkillRun({ id: 'historical', createdAt: historical }),
+      { ...makeSkillRun({ id: 'missing-b' }), createdAt: null },
+      makeSkillRun({ id: 'epoch', createdAt: epoch }),
+    ];
+
+    const [pattern] = detectPatterns(runs, { threshold: 2 });
+    assert.deepStrictEqual(pattern.runIds, ['epoch', 'historical', 'missing-a', 'missing-b']);
+    assert.strictEqual(pattern.lastSeen, epoch);
+    const patternRuns = [
+      { ...makeSkillRun({ id: 'a1', skillId: 'undated-a' }), createdAt: null },
+      { ...makeSkillRun({ id: 'a2', skillId: 'undated-a' }), createdAt: null },
+      makeSkillRun({ id: 'h1', skillId: 'historical', createdAt: '1969-12-31T23:59:58Z' }),
+      makeSkillRun({ id: 'h2', skillId: 'historical', createdAt: '1969-12-31T23:59:59Z' }),
+      { ...makeSkillRun({ id: 'b1', skillId: 'undated-b' }), createdAt: null },
+      { ...makeSkillRun({ id: 'b2', skillId: 'undated-b' }), createdAt: null },
+    ];
+
+    const patterns = detectPatterns(patternRuns, { threshold: 2 });
+    assert.deepStrictEqual(patterns.map(pattern => pattern.skillId), ['historical', 'undated-a', 'undated-b']);
+    assert.deepStrictEqual(patterns[1].runIds, ['a1', 'a2']);
+    assert.deepStrictEqual(patterns[2].runIds, ['b1', 'b2']);
+    assert.strictEqual(patterns[1].firstSeen, null);
+    assert.strictEqual(patterns[1].lastSeen, null);
+  })) passed += 1; else failed += 1;
+
   if (await test('detectPatterns uses default threshold', async () => {
     const runs = Array.from({ length: DEFAULT_FAILURE_THRESHOLD }, (_, i) =>
       makeSkillRun({ id: `r${i}`, failureReason: 'permission denied' })
