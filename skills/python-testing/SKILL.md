@@ -486,6 +486,9 @@ async def test_async_with_fixture(async_client):
 
 ### Async Fixture (FastAPI)
 
+`ASGITransport` does not run lifespan events. If the app needs startup/shutdown, wrap the client block in `async with LifespanManager(app) as manager:` (from `asgi_lifespan`)
+and use `ASGITransport(app=manager.app)`. See [FastAPI's async testing guidance](https://github.com/fastapi/fastapi/blob/master/docs/en/docs/advanced/async-tests.md).
+
 ```python
 import pytest
 import pytest_asyncio
