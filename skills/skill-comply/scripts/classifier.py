@@ -40,7 +40,7 @@ def classify_events(
         for i, event in enumerate(trace)
     )
 
-    prompt_template = (PROMPTS_DIR / "classifier.md").read_text()
+    prompt_template = (PROMPTS_DIR / "classifier.md").read_text(encoding="utf-8")
     prompt = (
         prompt_template
         .replace("{steps_description}", steps_desc)
@@ -50,7 +50,7 @@ def classify_events(
     result = subprocess.run(
         ["claude", "-p", prompt, "--model", model, "--output-format", "text"],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         timeout=60,
     )
 

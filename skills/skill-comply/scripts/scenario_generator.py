@@ -32,8 +32,8 @@ def generate_scenarios(
 
     Calls claude -p with the scenario_generator prompt, parses YAML output.
     """
-    skill_content = skill_path.read_text()
-    prompt_template = (PROMPTS_DIR / "scenario_generator.md").read_text()
+    skill_content = skill_path.read_text(encoding="utf-8")
+    prompt_template = (PROMPTS_DIR / "scenario_generator.md").read_text(encoding="utf-8")
     prompt = (
         prompt_template
         .replace("{skill_content}", skill_content)
@@ -43,7 +43,7 @@ def generate_scenarios(
     result = subprocess.run(
         ["claude", "-p", prompt, "--model", model, "--output-format", "text"],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         timeout=120,
     )
 
