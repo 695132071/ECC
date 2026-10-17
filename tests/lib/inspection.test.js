@@ -66,6 +66,9 @@ async function runTests() {
       String.raw`File not found: \\server\share\three.js`,
       String.raw`File not found: C:/project-a\src\one.js`,
       String.raw`File not found: D:\project-b/src/two.js`,
+      'File not found: C:\\project-a\\',
+      'File not found: D:/project-b/',
+      'File not found: \\\\server\\share\\',
     ]) {
       assert.strictEqual(normalizeFailureReason(reason), 'file not found: <path>');
     }
@@ -97,6 +100,9 @@ async function runTests() {
       String.raw`C:\Program Files\node`,
       'D:/Program Files/node',
       String.raw`\\server\shared files\node`,
+      String.raw`C:\Users\Alice Smith\my file.js`,
+      'D:/Users/Bob Jones/your script.js',
+      String.raw`\\server\shared files\other task.js`,
     ]) {
       assert.strictEqual(normalizeFailureReason(`${filePath}: permission denied`), '<path>: permission denied');
     }
@@ -108,6 +114,8 @@ async function runTests() {
       'cannot run <path> failed to open <path>');
     assert.strictEqual(normalizeFailureReason('D:/Program Files/node permission denied in /tmp/log'),
       '<path> permission denied in <path>');
+    assert.strictEqual(normalizeFailureReason('Cannot run C:/tools/node failed to open /tmp/log: permission denied'),
+      'cannot run <path> failed to open <path>: permission denied');
   })) passed += 1; else failed += 1;
 
   if (await test('groupFailures groups by skillId and normalized reason', async () => {
@@ -214,15 +222,21 @@ async function runTests() {
 
   if (await test('detectPatterns groups failures from different Windows paths', async () => {
     const runs = [
-      makeSkillRun({ id: 'r1', failureReason: String.raw`Cannot open C:\Users\Alice Smith\one.js: permission denied` }),
-      makeSkillRun({ id: 'r2', failureReason: 'Cannot open D:/Users/Bob Jones/two.js: permission denied' }),
-      makeSkillRun({ id: 'r3', failureReason: String.raw`Cannot open E:\Users\Carol White\three.js: permission denied` }),
+      makeSkillRun({ id: 'r1', failureReason: String.raw`Cannot open C:\Users\Alice Smith\my file.js: permission denied` }),
+      makeSkillRun({ id: 'r2', failureReason: 'Cannot open D:/Users/Bob Jones/your script.js: permission denied' }),
+      makeSkillRun({ id: 'r3', failureReason: String.raw`Cannot open E:\Users\Carol White\other task.js: permission denied` }),
     ];
     const patterns = detectPatterns(runs);
     assert.strictEqual(patterns.length, 1);
     assert.strictEqual(patterns[0].count, 3);
     assert.strictEqual(patterns[0].normalizedReason, 'cannot open <path>: permission denied');
     assert.strictEqual(inspect({ getStatus: () => ({ skillRuns: { recent: runs } }) }).status, 'attention_needed');
+    const directoryRuns = ['C:\\project-a\\', 'D:/project-b/', '\\\\server\\share\\'].map((filePath, index) =>
+      makeSkillRun({ id: `directory-${index}`, failureReason: `Cannot open ${filePath}` }));
+    const directoryPatterns = detectPatterns(directoryRuns);
+    assert.strictEqual(directoryPatterns.length, 1);
+    assert.strictEqual(directoryPatterns[0].count, 3);
+    assert.strictEqual(generateReport(directoryPatterns).status, 'attention_needed');
   })) passed += 1; else failed += 1;
 
   if (await test('detectPatterns tracks unique session IDs and versions', async () => {
