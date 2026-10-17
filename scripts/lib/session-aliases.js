@@ -58,7 +58,7 @@ function loadAliases() {
     const data = JSON.parse(content);
 
     // Validate structure
-    if (!data.aliases || typeof data.aliases !== 'object') {
+    if (!data.aliases || typeof data.aliases !== 'object' || Array.isArray(data.aliases)) {
       log('[Aliases] Invalid aliases file structure, resetting');
       return getDefaultAliases();
     }
