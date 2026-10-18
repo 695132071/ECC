@@ -104,6 +104,9 @@ async function runTests() {
       String.raw`C:\Users\Alice Smith\my file.js`,
       'D:/Users/Bob Jones/your script.js',
       String.raw`\\server\shared files\other task.js`,
+      String.raw`C:\work\my alpha.js~`,
+      'D:/work/my beta.py#',
+      String.raw`E:\work\my gamma.c++`,
     ]) {
       assert.strictEqual(normalizeFailureReason(`${filePath}: permission denied`), '<path>: permission denied');
     }
@@ -253,6 +256,15 @@ async function runTests() {
     assert.strictEqual(directoryPatterns.length, 1);
     assert.strictEqual(directoryPatterns[0].count, 3);
     assert.strictEqual(generateReport(directoryPatterns).status, 'attention_needed');
+    const backupRuns = [
+      String.raw`C:\work\my alpha.js~`,
+      'D:/work/my beta.js~',
+      String.raw`\\server\share\my gamma.js~`,
+    ].map((filePath, index) => makeSkillRun({ id: `backup-${index}`, failureReason: `Cannot open ${filePath}: permission denied` }));
+    const backupPatterns = detectPatterns(backupRuns);
+    assert.strictEqual(backupPatterns.length, 1);
+    assert.strictEqual(backupPatterns[0].count, 3);
+    assert.strictEqual(generateReport(backupPatterns).status, 'attention_needed');
   })) passed += 1; else failed += 1;
 
   if (await test('detectPatterns tracks unique session IDs and versions', async () => {
