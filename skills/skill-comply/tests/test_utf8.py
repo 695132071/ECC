@@ -2,9 +2,11 @@
 
 import json
 import locale
+import os
 import subprocess
 import sys
 from pathlib import Path
+from textwrap import dedent
 from typing import Any, Callable
 
 import pytest
@@ -129,3 +131,48 @@ def test_report_is_written_as_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(run, "generate_report", lambda *_args, **_kwargs: TEXT)
     run.main()
     assert output.read_text(encoding="utf-8") == TEXT
+
+
+def test_utf8_boundaries_under_legacy_encoding() -> None:
+    if os.environ.get("ECC_UTF8_TEST_CHILD") == "1":
+        pytest.skip("The child process must not launch another child")
+    script = dedent("""
+        import codecs
+        import io
+        import locale
+        import os
+        import sys
+
+        assert sys.flags.utf8_mode == 0
+        if os.name == "nt":
+            # Windows ignores LC_ALL for text I/O; emulate its legacy default.
+            original_open = io.open
+            def legacy_open(file, mode="r", buffering=-1, encoding=None, *args, **kwargs):
+                if "b" not in mode and encoding in (None, "locale"):
+                    encoding = "cp1252"
+                return original_open(file, mode, buffering, encoding, *args, **kwargs)
+            io.open = legacy_open
+            locale.getencoding = lambda: "cp1252"
+            locale.getpreferredencoding = lambda do_setlocale=True: "cp1252"
+        else:
+            assert codecs.lookup(locale.getencoding()).name == "ascii"
+        with io.open(os.devnull) as probe:
+            assert codecs.lookup(probe.encoding).name in {"ascii", "cp1252"}
+
+        import pytest
+        raise SystemExit(pytest.main(sys.argv[1:]))
+    """)
+    source = Path(__file__).resolve()
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8=0", "-c", script, str(source),
+         "-c", str(source.parents[1] / "pyproject.toml"), "-q",
+         "-k", "not test_utf8_boundaries_under_legacy_encoding", "-p", "no:cacheprovider"],
+        cwd=source.parents[1],
+        env={**os.environ, "LC_ALL": "C", "PYTHONCOERCELOCALE": "0", "PYTHONUTF8": "0",
+             "PYTHONIOENCODING": "utf-8", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+             "PYTEST_ADDOPTS": "", "ECC_UTF8_TEST_CHILD": "1"},
+        capture_output=True,
+        encoding="utf-8",
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
