@@ -87,6 +87,7 @@ async function runTests() {
       String.raw`C:\Usuarios\José Pérez\mi archivo.js`,
       String.raw`D:\用户\张三\我的 文件.js`,
       String.raw`\\servidor\recurso compartido\José\mi archivo.js`,
+      String.raw`C:\Program Files\my node`,
     ]) {
       for (const quote of ['"', "'"]) {
         assert.strictEqual(normalizeFailureReason(`Cannot open ${quote}${filePath}${quote}: permission denied`),
@@ -116,6 +117,9 @@ async function runTests() {
       '<path> permission denied in <path>');
     assert.strictEqual(normalizeFailureReason('Cannot run C:/tools/node failed to open /tmp/log: permission denied'),
       'cannot run <path> failed to open <path>: permission denied');
+    const denied = normalizeFailureReason(String.raw`C:\Program Files\node permission denied: EACCES`);
+    assert.strictEqual(denied, '<path> permission denied: eacces');
+    assert.notStrictEqual(denied, normalizeFailureReason(String.raw`C:\Program Files\node: EACCES`));
   })) passed += 1; else failed += 1;
 
   if (await test('groupFailures groups by skillId and normalized reason', async () => {
@@ -136,6 +140,18 @@ async function runTests() {
     const skillBGroup = groups.get('skill-b::parse error');
     assert.ok(skillBGroup);
     assert.strictEqual(skillBGroup.runs.length, 1);
+  })) passed += 1; else failed += 1;
+
+  if (await test('keeps distinct diagnostics after extensionless Windows paths separate', async () => {
+    const runs = [
+      String.raw`Command C:\tools\node exited with code: 1`,
+      String.raw`Command D:\tools\node exited with signal: 1`,
+      String.raw`Command E:\tools\node failed with status: 1`,
+    ].map((failureReason, index) => makeSkillRun({ id: `diagnostic-${index}`, failureReason }));
+    const patterns = detectPatterns(runs);
+    assert.strictEqual(generateReport(patterns).status, 'clean');
+    assert.deepStrictEqual(patterns, []);
+    assert.strictEqual(groupFailures(runs).size, 3);
   })) passed += 1; else failed += 1;
 
   if (await test('groupFailures handles mixed outcome casing', async () => {

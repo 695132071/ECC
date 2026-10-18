@@ -24,8 +24,8 @@ function normalizeFailureReason(reason) {
     // Quoted Windows paths preserve spaces in the final path component.
     .replace(/(["'])(?:[a-z]:[\\/]|\\\\)[^\r\n]*?\1/gu, '$1<path>$1')
     // Directories may contain spaces, but trailing whitespace separates diagnostic prose.
-    // A colon delimits spaced leaves; trailing separators belong to the path.
-    .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: [^\\/:*?"<>|\r\n]+(?=:))?[\\/]*/gu, '<path>')
+    // Spaced leaves need an extension before a colon, or quotes; preserve extensionless diagnostics.
+    .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: [^\\/:*?"<>|\r\n]*\.[\p{L}\p{N}_-]+(?=:))?[\\/]*/gu, '<path>')
     // Strip remaining file paths
     .replace(/(?:\b[a-z]:)?[\\/][\w./\\-]+/g, '<path>')
     // Collapse whitespace
