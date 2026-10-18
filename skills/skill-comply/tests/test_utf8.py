@@ -142,12 +142,16 @@ def test_utf8_boundaries_under_legacy_encoding() -> None:
         import locale
         import os
         import sys
+        from typing import IO, Any
 
         assert sys.flags.utf8_mode == 0
         if os.name == "nt":
             # Windows ignores LC_ALL for text I/O; emulate its legacy default.
             original_open = io.open
-            def legacy_open(file, mode="r", buffering=-1, encoding=None, *args, **kwargs):
+            def legacy_open(
+                file: Any, mode: str = "r", buffering: int = -1,
+                encoding: str | None = None, *args: Any, **kwargs: Any,
+            ) -> IO[Any]:
                 if "b" not in mode and encoding in (None, "locale"):
                     encoding = "cp1252"
                 return original_open(file, mode, buffering, encoding, *args, **kwargs)
