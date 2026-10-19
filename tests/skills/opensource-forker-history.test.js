@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Runs the documented Step 6 of agents/opensource-forker.md in a throwaway dir that already
- * holds FORK_REPORT.md / SANITIZATION_REPORT.md (as if the source project shipped them), and
- * checks they stay out of the first commit.
+ * Runs the documented Step 6 of agents/opensource-forker.md, then the opensource-pipeline fold-in
+ * block, in a throwaway dir that already holds FORK_REPORT.md / SANITIZATION_REPORT.md (as if the
+ * source project shipped them, with a .gitignore that re-includes them), and checks they stay out
+ * of the single published commit.
  *
  * Run with: node tests/skills/opensource-forker-history.test.js
  */
@@ -15,19 +16,20 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const AGENT_MD = path.join(__dirname, '..', '..', 'agents', 'opensource-forker.md');
+const ROOT = path.join(__dirname, '..', '..');
+const NAME = 'pre-existing reports stay out of the published fork commit';
 
-const step = fs.readFileSync(AGENT_MD, 'utf8').split('### Step 6: Clean Git History')[1];
-assert.ok(step, 'opensource-forker.md is missing "### Step 6: Clean Git History"');
-const block = step.match(/```bash\n([\s\S]*?)```/);
-assert.ok(block, 'no bash block in Step 6');
+function bashBlock(file, after) {
+  const section = fs.readFileSync(path.join(ROOT, file), 'utf8').split(after)[1];
+  assert.ok(section, `${file} is missing "${after}"`);
+  const block = section.match(/```bash\n([\s\S]*?)```/);
+  assert.ok(block, `no bash block after "${after}" in ${file}`);
+  return block[1];
+}
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oss-forker-'));
-try {
-  for (const f of ['README.md', 'FORK_REPORT.md', 'SANITIZATION_REPORT.md']) {
-    fs.writeFileSync(path.join(dir, f), 'x\n');
-  }
-  const r = spawnSync('bash', ['-ec', block[1].replaceAll('TARGET_DIR', dir)], {
+function run(script, dir) {
+  const r = spawnSync('bash', ['-ec', script], {
+    cwd: dir,
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -36,13 +38,45 @@ try {
     },
   });
   assert.strictEqual(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+if (process.platform === 'win32') {
+  // The documented blocks are bash; a Windows temp path does not survive `cd`.
+  console.log(`  - skipped: ${NAME} (bash test on Windows)`);
+  console.log('\nPassed: 0');
+  console.log('Failed: 0');
+  process.exit(0);
+}
+
+const step6 = bashBlock('agents/opensource-forker.md', '### Step 6: Clean Git History');
+const foldIn = bashBlock('skills/opensource-pipeline/SKILL.md', 'Fold changes in with:');
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oss-forker-'));
+let failed = 0;
+try {
+  for (const f of ['README.md', 'FORK_REPORT.md', 'SANITIZATION_REPORT.md']) {
+    fs.writeFileSync(path.join(dir, f), 'x\n');
+  }
+  // A .gitignore rule outranks .git/info/exclude, so a negation would re-include the reports.
+  fs.writeFileSync(path.join(dir, '.gitignore'), '!FORK_REPORT.md\n!SANITIZATION_REPORT.md\n');
+
+  run(step6.replaceAll('TARGET_DIR', dir), dir);
+  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'packaged\n');
+  const out = run(foldIn.replaceAll('{STAGING_PATH}', dir), dir).trim().split('\n');
+  assert.strictEqual(out.at(-1), '1', `fold-in must keep one commit, got: ${out.at(-1)}`);
+
   const files = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
-  assert.strictEqual(files, 'README.md', `first commit must hold only README.md, got: ${files}`);
-  console.log('  ✓ pre-existing reports stay out of the first fork commit');
+  assert.strictEqual(files, '.gitignore\nCLAUDE.md\nREADME.md', `commit must not hold the reports, got: ${files}`);
+  console.log(`  ✓ ${NAME}`);
 } catch (err) {
-  console.log('  ✗ pre-existing reports stay out of the first fork commit');
+  failed = 1;
+  console.log(`  ✗ ${NAME}`);
   console.log(`    Error: ${err.message}`);
-  process.exitCode = 1;
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }
+
+console.log(`\nPassed: ${1 - failed}`);
+console.log(`Failed: ${failed}`);
+process.exitCode = failed;

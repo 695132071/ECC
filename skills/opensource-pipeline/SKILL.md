@@ -91,8 +91,9 @@ sanitizer passed. The reports stay out of it. Fold changes in with:
 cd "{STAGING_PATH}"
 grep -qxF SANITIZATION_REPORT.md .git/info/exclude || printf '%s\n' FORK_REPORT.md SANITIZATION_REPORT.md >> .git/info/exclude
 git add -A
+git rm -q --cached --ignore-unmatch FORK_REPORT.md SANITIZATION_REPORT.md
 git commit --amend --no-edit
-git status --porcelain        # must print nothing
+git status --porcelain -uno   # must print nothing
 git rev-list --count HEAD     # must print 1
 ```
 
