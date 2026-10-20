@@ -96,6 +96,21 @@ async function runTests() {
     }
   })) passed += 1; else failed += 1;
 
+  if (await test('normalizeFailureReason keeps apostrophes inside quoted Windows paths', async () => {
+    for (const filePath of [
+      String.raw`C:\Users\O'Brien\report.js`,
+      String.raw`D:\Users\D'Arcy\my report.js`,
+      String.raw`\\server\shared files\L'Heureux\report.js`,
+    ]) {
+      assert.strictEqual(normalizeFailureReason(`Cannot open '${filePath}': permission denied`),
+        "cannot open '<path>': permission denied");
+    }
+    assert.notStrictEqual(
+      normalizeFailureReason(String.raw`Cannot open 'C:\Users\O'Brien\report.js': permission denied`),
+      normalizeFailureReason(String.raw`Cannot open 'C:\Users\O'Brien\report.js': file missing`)
+    );
+  })) passed += 1; else failed += 1;
+
   if (await test('normalizeFailureReason preserves diagnostics after unquoted Windows paths', async () => {
     for (const filePath of [
       String.raw`C:\Program Files\node`,
@@ -265,6 +280,20 @@ async function runTests() {
     assert.strictEqual(backupPatterns.length, 1);
     assert.strictEqual(backupPatterns[0].count, 3);
     assert.strictEqual(generateReport(backupPatterns).status, 'attention_needed');
+  })) passed += 1; else failed += 1;
+
+  if (await test('inspect groups quoted Windows paths with apostrophes and preserves diagnostics', async () => {
+    const runs = [
+      String.raw`Cannot open 'C:\Users\O'Brien\report.js': permission denied`,
+      String.raw`Cannot open 'D:\Users\D'Arcy\my report.js': permission denied`,
+      String.raw`Cannot open '\\server\shared files\L'Heureux\report.js': permission denied`,
+    ].map((failureReason, index) => makeSkillRun({ id: `apostrophe-${index}`, failureReason }));
+    const report = inspect({ getStatus: () => ({ skillRuns: { recent: runs } }) });
+    assert.strictEqual(report.status, 'attention_needed');
+    assert.strictEqual(report.patternCount, 1);
+    assert.strictEqual(report.patterns[0].count, 3);
+    assert.strictEqual(report.patterns[0].normalizedReason, "cannot open '<path>': permission denied");
+    assert.deepStrictEqual(report.patterns[0].rawReasons, runs.map(run => run.failureReason));
   })) passed += 1; else failed += 1;
 
   if (await test('detectPatterns tracks unique session IDs and versions', async () => {

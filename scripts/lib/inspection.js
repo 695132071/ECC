@@ -21,8 +21,9 @@ function normalizeFailureReason(reason) {
     .replace(/\d{4}-\d{2}-\d{2}[t ]\d{2}:\d{2}:\d{2}[.\dz]*/g, '<timestamp>')
     // Strip UUIDs (already lowercased)
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<uuid>')
-    // Quoted Windows paths preserve spaces in the final path component.
-    .replace(/(["'])(?:[a-z]:[\\/]|\\\\)[^\r\n]*?\1/gu, '$1<path>$1')
+    // Quoted Windows paths preserve spaces and apostrophes inside path components.
+    // A closing quote must be followed by a delimiter, not another name character.
+    .replace(/(["'])(?:[a-z]:[\\/]|\\\\)[^\r\n]*?\1(?=[:\s),;.!?]|$)/gu, '$1<path>$1')
     // Directories may contain spaces, but trailing whitespace separates diagnostic prose.
     // Spaced leaves need an extension before a colon, or quotes; preserve extensionless diagnostics.
     .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: [^\\/:*?"<>|\r\n]*\.[^\s\\/:*?"<>|]+(?=:))?[\\/]*/gu, '<path>')
