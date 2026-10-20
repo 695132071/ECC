@@ -51,6 +51,7 @@ if (process.platform === 'win32') {
 
 const step6 = bashBlock('agents/opensource-forker.md', '### Step 6: Clean Git History');
 const foldIn = bashBlock('skills/opensource-pipeline/SKILL.md', 'Fold changes in with:');
+const publishBlock = bashBlock('skills/opensource-pipeline/SKILL.md', '#### Step 7: GitHub Publish');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oss-forker-'));
 let failed = 0;
@@ -68,6 +69,23 @@ try {
 
   const files = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
   assert.strictEqual(files, '.gitignore\nCLAUDE.md\nREADME.md', `commit must not hold the reports, got: ${files}`);
+  const scanned = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+  const bin = path.join(dir, '.git', 'test-bin');
+  const published = path.join(dir, '.git', 'published-marker');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'gh'), `#!/bin/sh\ntouch "${published}"\n`, { mode: 0o755 });
+  const publish = publishBlock
+    .replaceAll('{STAGING_PATH}', dir)
+    .replaceAll('{SCANNED_COMMIT}', scanned);
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+  const clean = spawnSync('bash', ['-ec', publish], { cwd: dir, encoding: 'utf8', env });
+  assert.strictEqual(clean.status, 0, clean.stderr);
+  assert.ok(fs.existsSync(published), 'clean scanned commit with only untracked reports should publish');
+  fs.rmSync(published);
+  fs.writeFileSync(path.join(dir, 'extra.txt'), 'unreviewed\n');
+  const dirty = spawnSync('bash', ['-ec', publish], { cwd: dir, encoding: 'utf8', env });
+  assert.notStrictEqual(dirty.status, 0, 'other untracked files must block publication');
+  assert.ok(!fs.existsSync(published), 'dirty tree must not invoke gh');
   console.log(`  ✓ ${NAME}`);
 } catch (err) {
   failed = 1;

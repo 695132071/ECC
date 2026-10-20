@@ -44,7 +44,7 @@ function git(cwd, ...args) {
 }
 
 // One-commit staging repo; returns the commit the sanitizer "scanned".
-function withStaging(fn) {
+function withStaging(fn, { committedReport = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oss-publish-'));
   try {
     const staging = path.join(root, 'staging');
@@ -56,6 +56,7 @@ function withStaging(fn) {
     git(staging, 'config', 'user.email', 'test@example.com');
     git(staging, 'config', 'user.name', 'test');
     fs.writeFileSync(path.join(staging, 'README.md'), 'clean\n');
+    if (committedReport) fs.writeFileSync(path.join(staging, 'FORK_REPORT.md'), 'must not publish\n');
     git(staging, 'add', '-A');
     git(staging, 'commit', '-q', '-m', 'init');
     const scanned = git(staging, 'rev-parse', 'HEAD');
@@ -104,6 +105,14 @@ function runTests() {
       assert.notStrictEqual(r.status, 0);
       assert.ok(!r.published, 'gh repo create ran for an unscanned commit');
     });
+  })) passed++; else failed++;
+
+  if (test('refuses to publish a commit containing a report', () => {
+    withStaging(({ publish }) => {
+      const r = publish();
+      assert.notStrictEqual(r.status, 0);
+      assert.ok(!r.published, 'gh repo create ran with a tracked report');
+    }, { committedReport: true });
   })) passed++; else failed++;
 
   console.log(`\nPassed: ${passed}`);

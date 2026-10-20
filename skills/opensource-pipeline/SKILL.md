@@ -229,11 +229,16 @@ Proceed with GitHub creation? (yes/no/review first)
 
 Push only the commit the sanitizer passed. If the tree or the commit changed since Step 5b (for
 example the user edited files after "review first" and amended), go back to Step 5b instead of
-pushing.
+pushing. The two generated reports may remain untracked even when a source `.gitignore` negates
+their names. Allow only those two untracked files; a report in the index or scanned commit, or any
+other worktree change, still stops publication.
 
 ```bash
 cd "{STAGING_PATH}"
-test -z "$(git status --porcelain)" && test "$(git rev-list --count HEAD)" = 1 \
+test -z "$(git ls-files -- FORK_REPORT.md SANITIZATION_REPORT.md)" \
+  && test -z "$(git ls-tree -r --name-only HEAD -- FORK_REPORT.md SANITIZATION_REPORT.md)" \
+  && test -z "$(git status --porcelain --untracked-files=all -- . ':(exclude)FORK_REPORT.md' ':(exclude)SANITIZATION_REPORT.md')" \
+  && test "$(git rev-list --count HEAD)" = 1 \
   && test "$(git rev-parse HEAD)" = "{SCANNED_COMMIT}" \
   || { echo "Uncommitted changes, extra commits, or HEAD is not the scanned commit: return to Step 5b" >&2; exit 1; }
 gh repo create "{github_org}/{github_repo}" --public --source=. --push --description "{description}"
