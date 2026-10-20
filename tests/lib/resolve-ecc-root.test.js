@@ -548,7 +548,7 @@ module.exports = { resolveEccRoot() { assert.strictEqual(process.env.HOME, ${JSO
         });
         // On WSL, 'C:\\Users\\test\\.claude' is converted to '/mnt/c/Users/test/.claude'.
         // No install exists at the converted path, so resolveEccRoot falls back to it.
-        assert.strictEqual(result, '/mnt/c/Users/test/.claude');
+        assert.strictEqual(result, path.resolve('/mnt/c/Users/test/.claude'));
       } finally {
         fs.rmSync(homeDir, { recursive: true, force: true });
       }
