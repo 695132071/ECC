@@ -172,6 +172,19 @@ async function runTests() {
     assert.strictEqual(groupFailures(runs).size, 3);
   })) passed += 1; else failed += 1;
 
+  if (await test('keeps dotted diagnostic prose after extensionless Windows paths separate', async () => {
+    const reasons = [
+      String.raw`Command C:\tools\node failed to open config.json: EACCES`,
+      String.raw`Command D:\tools\node timed out opening config.json: EACCES`,
+    ];
+    assert.deepStrictEqual(reasons.map(normalizeFailureReason), [
+      'command <path> failed to open config.json: eacces',
+      'command <path> timed out opening config.json: eacces',
+    ]);
+    const runs = reasons.map((failureReason, index) => makeSkillRun({ id: `dotted-${index}`, failureReason }));
+    assert.strictEqual(groupFailures(runs).size, 2);
+  })) passed += 1; else failed += 1;
+
   if (await test('groupFailures handles mixed outcome casing', async () => {
     const runs = [
       makeSkillRun({ id: 'r1', outcome: 'FAILURE', failureReason: 'timeout' }),

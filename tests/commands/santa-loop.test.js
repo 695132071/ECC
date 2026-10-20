@@ -15,6 +15,8 @@ const commands = [
 
 if (process.platform === 'win32') {
   console.log('Skipped: Santa Loop examples require Bash');
+  console.log('Passed: 0');
+  console.log('Failed: 0');
   process.exit(0);
 }
 
