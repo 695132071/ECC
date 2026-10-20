@@ -27,7 +27,7 @@ function normalizeFailureReason(reason) {
     // Directories may contain spaces, but trailing whitespace separates diagnostic prose.
     // Unquoted spaced leaves allow one final dotted token; longer prose stays diagnostic.
     // Quote paths with multiple spaces in the final filename to remove ambiguity.
-    .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: (?!failed\b|timed\b|could\b|cannot\b|unable\b|error\b)[^\s\\/:*?"<>|]+\.[^\s\\/:*?"<>|]+(?=:))?[\\/]*/gu, '<path>')
+    .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: [^\s\\/:*?"<>|]+\.[^\s\\/:*?"<>|]+(?=:))?[\\/]*/gu, '<path>')
     // Strip remaining file paths
     .replace(/(?:\b[a-z]:)?[\\/][\w./\\-]+/g, '<path>')
     // Collapse whitespace
