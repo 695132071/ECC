@@ -25,8 +25,9 @@ function normalizeFailureReason(reason) {
     // A closing quote must be followed by a delimiter, not another name character.
     .replace(/(["'])(?:[a-z]:[\\/]|\\\\)[^\r\n]*?\1(?=[:\s),;.!?]|$)/gu, '$1<path>$1')
     // Directories may contain spaces, but trailing whitespace separates diagnostic prose.
-    // Spaced leaves need an extension before a colon, or quotes; preserve extensionless diagnostics.
-    .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: [^\\/:*?"<>|\r\n]*\.[^\s\\/:*?"<>|]+(?=:))?[\\/]*/gu, '<path>')
+    // Unquoted spaced leaves allow one final dotted token; longer prose stays diagnostic.
+    // Quote paths with multiple spaces in the final filename to remove ambiguity.
+    .replace(/(?:\b[a-z]:|\\)[\\/](?:[^\\/:*?"<>|\r\n]*[^\s\\/:*?"<>|][\\/])*[^\s\\/:*?"<>|(),;]+(?: [^\s\\/:*?"<>|]+\.[^\s\\/:*?"<>|]+(?=:))?[\\/]*/gu, '<path>')
     // Strip remaining file paths
     .replace(/(?:\b[a-z]:)?[\\/][\w./\\-]+/g, '<path>')
     // Collapse whitespace

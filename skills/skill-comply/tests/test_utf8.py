@@ -27,7 +27,8 @@ SPEC = {"id": "unicode", "name": TEXT, "source_rule": TEXT, "version": "1",
 def mock_cli(payload: str) -> Callable[..., subprocess.CompletedProcess[str]]:
     """Emulate decoding UTF-8 CLI bytes using the caller's selected encoding."""
     def execute(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        assert TEXT in command[2]
+        assert command[:2] == ["claude", "-p"]
+        assert TEXT in kwargs["input"]
         encoding = kwargs.get("encoding") or locale.getpreferredencoding(False)
         return subprocess.CompletedProcess(command, 0, stdout=payload.encode("utf-8").decode(encoding), stderr="")
     return execute
@@ -67,7 +68,7 @@ def test_generators_preserve_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     ]}
     execute = mock_cli(yaml.safe_dump(response, allow_unicode=True))
     def checked_execute(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        assert PROMPT_TEXT in command[2]
+        assert PROMPT_TEXT in kwargs["input"]
         return execute(command, **kwargs)
     monkeypatch.setattr(module.subprocess, "run", checked_execute)
     if kind == "spec":
@@ -82,7 +83,7 @@ def test_spec_retry_preserves_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     responses = iter(["steps: [invalid", yaml.safe_dump(SPEC, allow_unicode=True)])
     prompts: list[str] = []
     def execute(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        prompts.append(command[2])
+        prompts.append(kwargs["input"])
         return mock_cli(next(responses))(command, **kwargs)
     monkeypatch.setattr(spec_generator.subprocess, "run", execute)
     assert spec_generator.generate_spec(skill, max_retries=1).name == TEXT
@@ -95,7 +96,7 @@ def test_classifier_preserves_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(classifier, "PROMPTS_DIR", tmp_path)
     execute = mock_cli(json.dumps({TEXT: [0]}, ensure_ascii=False))
     def checked_execute(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        assert PROMPT_TEXT in command[2]
+        assert PROMPT_TEXT in kwargs["input"]
         return execute(command, **kwargs)
     monkeypatch.setattr(classifier.subprocess, "run", checked_execute)
     spec = ComplianceSpec("unicode", TEXT, TEXT, "1", (Step(TEXT, TEXT, True, Detector(TEXT)),), 0.6)
@@ -114,6 +115,34 @@ def test_runner_preserves_utf8_capture(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(runner.subprocess, "run", mock_cli(payload))
     scenario = Scenario("unicode", 1, "one", TEXT, TEXT, ())
     assert runner.run_scenario(scenario).observations[0].output == TEXT
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows does not use the POSIX locale for argv encoding")
+def test_real_cli_receives_utf8_prompt_on_stdin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A real child process catches Unicode argv failures that mocked run calls miss."""
+    fake_cli = tmp_path / "claude"
+    fake_cli.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os, sys\n"
+        "data = sys.stdin.buffer.read()\n"
+        "with open(os.environ['ECC_FAKE_CLAUDE_STDIN'], 'wb') as stream:\n"
+        "    stream.write(data)\n"
+        "with open(os.environ['ECC_FAKE_CLAUDE_RESPONSE'], 'rb') as stream:\n"
+        "    sys.stdout.buffer.write(stream.read())\n",
+        encoding="ascii",
+    )
+    fake_cli.chmod(0o755)
+    captured = tmp_path / "stdin.bin"
+    response = tmp_path / "response.yaml"
+    response.write_text(yaml.safe_dump(SPEC, allow_unicode=True), encoding="utf-8")
+    monkeypatch.setenv("ECC_FAKE_CLAUDE_STDIN", str(captured))
+    monkeypatch.setenv("ECC_FAKE_CLAUDE_RESPONSE", str(response))
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+
+    skill = tmp_path / "SKILL.md"
+    skill.write_text(TEXT, encoding="utf-8")
+    assert spec_generator.generate_spec(skill, max_retries=0).name == TEXT
+    assert TEXT.encode("utf-8") in captured.read_bytes()
 
 
 def test_report_is_written_as_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

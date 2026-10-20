@@ -50,7 +50,7 @@ def run_scenario(
 
     result = subprocess.run(
         [
-            "claude", "-p", scenario.prompt,
+            "claude", "-p",
             "--model", model,
             "--max-turns", str(max_turns),
             "--add-dir", str(sandbox_dir),
@@ -58,6 +58,7 @@ def run_scenario(
             "--output-format", "stream-json",
             "--verbose",
         ],
+        input=scenario.prompt,
         capture_output=True,
         encoding="utf-8",
         timeout=timeout,

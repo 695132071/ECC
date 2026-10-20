@@ -41,7 +41,8 @@ def generate_scenarios(
     )
 
     result = subprocess.run(
-        ["claude", "-p", prompt, "--model", model, "--output-format", "text"],
+        ["claude", "-p", "--model", model, "--output-format", "text"],
+        input=prompt,
         capture_output=True,
         encoding="utf-8",
         timeout=120,

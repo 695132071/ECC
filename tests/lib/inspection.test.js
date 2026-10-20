@@ -172,6 +172,37 @@ async function runTests() {
     assert.strictEqual(groupFailures(runs).size, 3);
   })) passed += 1; else failed += 1;
 
+  if (await test('keeps dotted diagnostic prose after extensionless Windows paths separate', async () => {
+    const reasons = [
+      String.raw`Command C:\tools\node failed to open config.json: EACCES`,
+      String.raw`Command D:\tools\node timed out opening config.json: EACCES`,
+    ];
+    assert.deepStrictEqual(reasons.map(normalizeFailureReason), [
+      'command <path> failed to open config.json: eacces',
+      'command <path> timed out opening config.json: eacces',
+    ]);
+    const runs = reasons.map((failureReason, index) => makeSkillRun({ id: `dotted-${index}`, failureReason }));
+    assert.strictEqual(groupFailures(runs).size, 2);
+  })) passed += 1; else failed += 1;
+
+  if (await test('groups Windows filenames with diagnostic-looking words', async () => {
+    const reasons = [
+      String.raw`Command C:\work\app error.log: permission denied`,
+      String.raw`Command D:\work\app output.log: permission denied`,
+      String.raw`Command E:\work\my failed-test.js: permission denied`,
+    ];
+    assert.deepStrictEqual(reasons.map(normalizeFailureReason), [
+      'command <path>: permission denied',
+      'command <path>: permission denied',
+      'command <path>: permission denied',
+    ]);
+    const runs = reasons.map((failureReason, index) => makeSkillRun({ id: `filename-${index}`, failureReason }));
+    assert.strictEqual(groupFailures(runs).size, 1);
+    const patterns = detectPatterns(runs);
+    assert.strictEqual(patterns.length, 1);
+    assert.strictEqual(patterns[0].count, 3);
+  })) passed += 1; else failed += 1;
+
   if (await test('groupFailures handles mixed outcome casing', async () => {
     const runs = [
       makeSkillRun({ id: 'r1', outcome: 'FAILURE', failureReason: 'timeout' }),
