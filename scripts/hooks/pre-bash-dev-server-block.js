@@ -170,8 +170,9 @@ const TMUX_PANE_COMMANDS = new Set([
   'respawn-window', 'respawnw',
   'send-keys', 'send'
 ]);
-// Options that come before the tmux command and take a value.
-const TMUX_OPTIONS_WITH_VALUE = new Set(['-f', '-L', '-S', '-T']);
+// tmux's own options that take a value (`-L work`, `-Lwork`, or the last of a
+// cluster such as `-vL work`).
+const TMUX_OPTION_VALUE_LETTERS = new Set(['f', 'L', 'S', 'T']);
 // Trailing (?![\w-]) rather than \b: \b treats a hyphen as a word boundary, so
 // `dev\b` matches the `dev` prefix of distinct scripts like `dev-setup` /
 // `dev-docs` / `dev-build` and wrongly blocks them. The lookahead still matches
@@ -211,31 +212,39 @@ function collectCheckSegments(cmd) {
 }
 
 /**
- * Return true when the tmux invocation that starts at `index` runs its command
- * in a pane. The tmux command follows tmux's own options (`-L work`, `-f conf`),
- * and the executable may come through a path or an env prefix, so this reads
- * the parsed tokens instead of the start of the segment.
+ * Return true when the tmux invocation that starts at `index` runs the dev
+ * server in a pane. The tmux commands follow tmux's own options (`-L work`,
+ * `-f conf`), and the executable may come through a path or an env prefix, so
+ * this reads the parsed tokens instead of the start of the segment. A sequence
+ * (`new-session -d \; run-shell ...`) is exempt only when every command in it
+ * that runs the dev server is a pane command.
  */
 function isTmuxPaneLaunch(segment, index) {
-  while (index < segment.length) {
-    const parsed = readToken(segment, index);
-    if (!parsed) return false;
-    index = parsed.end;
-
-    const token = parsed.token;
-    if (!token) continue;
-    if (token === '-c') return false;
-    if (TMUX_OPTIONS_WITH_VALUE.has(token)) {
-      const value = readToken(segment, index);
-      if (!value) return false;
-      index = value.end;
-      continue;
-    }
-    if (isOptionToken(token)) continue;
-    return TMUX_PANE_COMMANDS.has(token);
+  const tokens = [];
+  for (let parsed = readToken(segment, index); parsed; parsed = readToken(segment, parsed.end)) {
+    if (parsed.token) tokens.push(parsed.token);
   }
 
-  return false;
+  let next = 0;
+  for (; next < tokens.length && isOptionToken(tokens[next]); next++) {
+    const letters = tokens[next].slice(1);
+    for (let i = 0; i < letters.length; i++) {
+      // -c runs its shell command without a pane.
+      if (letters[i] === 'c') return false;
+      if (TMUX_OPTION_VALUE_LETTERS.has(letters[i])) {
+        if (i === letters.length - 1) next++;
+        break;
+      }
+    }
+  }
+
+  const commands = [[]];
+  for (const token of tokens.slice(next)) {
+    if (token === ';') commands.push([]);
+    else commands[commands.length - 1].push(token);
+  }
+  const devCommands = commands.filter(command => DEV_PATTERN.test(command.join(' ')));
+  return devCommands.length > 0 && devCommands.every(command => TMUX_PANE_COMMANDS.has(command[0]));
 }
 
 function isBlockedDevSegment(segment) {

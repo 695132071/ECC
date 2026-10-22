@@ -70,7 +70,17 @@ function runTests() {
     }) ? passed++ : failed++);
 
     (test('still blocks tmux run-shell and tmux -c — no pane keeps the log (exit 2)', () => {
-      for (const command of ['tmux run-shell "npm run dev"', 'tmux -L work run-shell "npm run dev"', 'tmux -c "npm run dev"']) {
+      for (const command of [
+        'tmux run-shell "npm run dev"',
+        'tmux -L work run-shell "npm run dev"',
+        'tmux -c "npm run dev"',
+        "tmux -c'npm run dev'",
+        // In -vL the L takes `new-session` as its socket name, so run-shell is the command.
+        'tmux -vL new-session run-shell "npm run dev"',
+        // A pane command earlier in a sequence does not cover a later run-shell.
+        'tmux new-session -d \\; run-shell "npm run dev"',
+        'tmux -L work new-session -d \\; run-shell "npm run dev"'
+      ]) {
         const result = runScript(command);
         assert.strictEqual(result.code, 2, `Expected exit code 2 for ${command}, got ${result.code}`);
       }
@@ -101,7 +111,11 @@ function runTests() {
   }) ? passed++ : failed++);
 
   (test('allows npm run dev sent to or respawned in a tmux pane (exit code 0)', () => {
-    for (const command of ['tmux send-keys -t dev "npm run dev" Enter', 'tmux respawn-pane -k -t dev "npm run dev"']) {
+    for (const command of [
+      'tmux send-keys -t dev "npm run dev" Enter',
+      'tmux respawn-pane -k -t dev "npm run dev"',
+      'tmux new-session -d -s dev \\; send-keys -t dev "npm run dev" Enter'
+    ]) {
       const result = runScript(command);
       assert.strictEqual(result.code, 0, `Expected exit code 0 for ${command}, got ${result.code}`);
     }
