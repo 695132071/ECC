@@ -1217,6 +1217,11 @@ async function runTests() {
         const result = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', {}, appDir);
         assert.strictEqual(result.code, 0);
         assert.ok(result.stderr.includes('console.log found in packages/app/src/a.ts'), `Should warn about the file, got: ${result.stderr}`);
+
+        // diff.relative would make git report paths from the session's directory.
+        execFileSync('git', ['config', 'diff.relative', 'true'], { cwd: repo });
+        const relative = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', {}, appDir);
+        assert.ok(relative.stderr.includes('console.log found in packages/app/src/a.ts'), `Should warn with diff.relative, got: ${relative.stderr}`);
       } finally {
         fs.rmSync(repo, { recursive: true, force: true });
       }
