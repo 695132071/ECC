@@ -68,6 +68,13 @@ function runTests() {
       const result = runScript('npm run dev:ssr');
       assert.strictEqual(result.code, 2, `Expected exit code 2, got ${result.code}`);
     }) ? passed++ : failed++);
+
+    (test('still blocks tmux run-shell and tmux -c — no pane keeps the log (exit 2)', () => {
+      for (const command of ['tmux run-shell "npm run dev"', 'tmux -L work run-shell "npm run dev"', 'tmux -c "npm run dev"']) {
+        const result = runScript(command);
+        assert.strictEqual(result.code, 2, `Expected exit code 2 for ${command}, got ${result.code}`);
+      }
+    }) ? passed++ : failed++);
   } else {
     console.log('  (skipping blocking tests on Windows)\n');
   }
@@ -77,6 +84,27 @@ function runTests() {
   (test('allows tmux-wrapped npm run dev (exit code 0)', () => {
     const result = runScript('tmux new-session -d -s dev "npm run dev"');
     assert.strictEqual(result.code, 0, `Expected exit code 0, got ${result.code}`);
+  }) ? passed++ : failed++);
+
+  (test('allows a tmux launch after tmux options, a path, an env prefix or a command alias (exit code 0)', () => {
+    for (const command of [
+      'tmux -L work new-session -d -s dev "npm run dev"',
+      'tmux -f ~/.tmux.dev.conf new-session -d "npm run dev"',
+      '/opt/homebrew/bin/tmux new-session -d -s dev "npm run dev"',
+      'env TERM=xterm-256color tmux new-session -d "npm run dev"',
+      'tmux neww "npm run dev"',
+      'tmux splitw -h "pnpm dev"'
+    ]) {
+      const result = runScript(command);
+      assert.strictEqual(result.code, 0, `Expected exit code 0 for ${command}, got ${result.code}`);
+    }
+  }) ? passed++ : failed++);
+
+  (test('allows npm run dev sent to or respawned in a tmux pane (exit code 0)', () => {
+    for (const command of ['tmux send-keys -t dev "npm run dev" Enter', 'tmux respawn-pane -k -t dev "npm run dev"']) {
+      const result = runScript(command);
+      assert.strictEqual(result.code, 0, `Expected exit code 0 for ${command}, got ${result.code}`);
+    }
   }) ? passed++ : failed++);
 
   (test('allows npm install (exit code 0)', () => {

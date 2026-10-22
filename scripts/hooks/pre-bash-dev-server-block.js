@@ -104,7 +104,7 @@ function normalizeCommandWord(token) {
   return base.replace(/\.(cmd|exe|bat)$/i, '');
 }
 
-function getLeadingCommandWord(segment) {
+function getLeadingCommand(segment) {
   let index = 0;
   let activeWrapper = null;
   let skipNextValue = false;
@@ -145,7 +145,7 @@ function getLeadingCommandWord(segment) {
       continue;
     }
 
-    return normalizedToken;
+    return { word: normalizedToken, end: index };
   }
 
   return null;
@@ -160,7 +160,18 @@ process.stdin.on('data', chunk => {
   }
 });
 
-const TMUX_LAUNCHER = /^\s*tmux\s+(new|new-session|new-window|split-window)\b/;
+// tmux commands, and their aliases, that run their shell command in a tmux pane,
+// where its output stays readable. run-shell and `tmux -c` run it without one.
+const TMUX_PANE_COMMANDS = new Set([
+  'new-session', 'new',
+  'new-window', 'neww',
+  'split-window', 'splitw',
+  'respawn-pane', 'respawnp',
+  'respawn-window', 'respawnw',
+  'send-keys', 'send'
+]);
+// Options that come before the tmux command and take a value.
+const TMUX_OPTIONS_WITH_VALUE = new Set(['-f', '-L', '-S', '-T']);
 // Trailing (?![\w-]) rather than \b: \b treats a hyphen as a word boundary, so
 // `dev\b` matches the `dev` prefix of distinct scripts like `dev-setup` /
 // `dev-docs` / `dev-build` and wrongly blocks them. The lookahead still matches
@@ -199,10 +210,39 @@ function collectCheckSegments(cmd) {
   return segments;
 }
 
+/**
+ * Return true when the tmux invocation that starts at `index` runs its command
+ * in a pane. The tmux command follows tmux's own options (`-L work`, `-f conf`),
+ * and the executable may come through a path or an env prefix, so this reads
+ * the parsed tokens instead of the start of the segment.
+ */
+function isTmuxPaneLaunch(segment, index) {
+  while (index < segment.length) {
+    const parsed = readToken(segment, index);
+    if (!parsed) return false;
+    index = parsed.end;
+
+    const token = parsed.token;
+    if (!token) continue;
+    if (token === '-c') return false;
+    if (TMUX_OPTIONS_WITH_VALUE.has(token)) {
+      const value = readToken(segment, index);
+      if (!value) return false;
+      index = value.end;
+      continue;
+    }
+    if (isOptionToken(token)) continue;
+    return TMUX_PANE_COMMANDS.has(token);
+  }
+
+  return false;
+}
+
 function isBlockedDevSegment(segment) {
-  const commandWord = getLeadingCommandWord(segment);
-  if (!commandWord || !DEV_COMMAND_WORDS.has(commandWord)) return false;
-  return DEV_PATTERN.test(segment) && !TMUX_LAUNCHER.test(segment);
+  const command = getLeadingCommand(segment);
+  if (!command || !DEV_COMMAND_WORDS.has(command.word)) return false;
+  if (!DEV_PATTERN.test(segment)) return false;
+  return !(command.word === 'tmux' && isTmuxPaneLaunch(segment, command.end));
 }
 
 process.stdin.on('end', () => {
