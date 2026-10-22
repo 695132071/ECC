@@ -56,7 +56,9 @@ function readToken(input, startIndex) {
         continue;
       }
 
-      if (ch === '\\' && quote === '"' && index + 1 < input.length) {
+      // Inside double quotes, bash drops a backslash only before $ ` " \ or a
+      // newline, so `"echo ready\;"` keeps its `\;` for tmux.
+      if (ch === '\\' && quote === '"' && index + 1 < input.length && '$`"\\\n'.includes(input[index + 1])) {
         token += input[index + 1];
         index += 2;
         continue;

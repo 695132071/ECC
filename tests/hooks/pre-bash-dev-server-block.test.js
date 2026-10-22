@@ -117,7 +117,9 @@ function runTests() {
       'tmux send-keys -t dev "npm run dev" Enter',
       'tmux respawn-pane -k -t dev "npm run dev"',
       'tmux new-session -d -s dev \\; send-keys -t dev "npm run dev" Enter',
-      "tmux new-session -d 'echo start;' send-keys -t dev 'npm run dev' Enter"
+      "tmux new-session -d 'echo start;' send-keys -t dev 'npm run dev' Enter",
+      // In double quotes bash keeps the backslash before ;, so tmux reads a literal ;
+      'tmux send-keys -t dev "echo ready\\;" "npm run dev" Enter'
     ]) {
       const result = runScript(command);
       assert.strictEqual(result.code, 0, `Expected exit code 0 for ${command}, got ${result.code}`);
