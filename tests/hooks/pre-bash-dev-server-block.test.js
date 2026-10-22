@@ -79,7 +79,9 @@ function runTests() {
         'tmux -vL new-session run-shell "npm run dev"',
         // A pane command earlier in a sequence does not cover a later run-shell.
         'tmux new-session -d \\; run-shell "npm run dev"',
-        'tmux -L work new-session -d \\; run-shell "npm run dev"'
+        'tmux -L work new-session -d \\; run-shell "npm run dev"',
+        // A `;` that ends an argument separates tmux commands too.
+        "tmux -L work new-session -d 'npm run dev;' run-shell 'npm run dev'"
       ]) {
         const result = runScript(command);
         assert.strictEqual(result.code, 2, `Expected exit code 2 for ${command}, got ${result.code}`);
@@ -114,7 +116,8 @@ function runTests() {
     for (const command of [
       'tmux send-keys -t dev "npm run dev" Enter',
       'tmux respawn-pane -k -t dev "npm run dev"',
-      'tmux new-session -d -s dev \\; send-keys -t dev "npm run dev" Enter'
+      'tmux new-session -d -s dev \\; send-keys -t dev "npm run dev" Enter',
+      "tmux new-session -d 'echo start;' send-keys -t dev 'npm run dev' Enter"
     ]) {
       const result = runScript(command);
       assert.strictEqual(result.code, 0, `Expected exit code 0 for ${command}, got ${result.code}`);

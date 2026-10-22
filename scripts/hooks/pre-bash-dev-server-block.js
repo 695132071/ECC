@@ -238,10 +238,14 @@ function isTmuxPaneLaunch(segment, index) {
     }
   }
 
+  // tmux ends a command at a `;` argument and at a `;` that ends an argument
+  // (`'npm run dev;'`); an escaped `\;` at the end stays literal.
   const commands = [[]];
   for (const token of tokens.slice(next)) {
-    if (token === ';') commands.push([]);
-    else commands[commands.length - 1].push(token);
+    const ends = token.endsWith(';') && !token.endsWith('\\;');
+    const value = ends ? token.slice(0, -1) : token;
+    if (value) commands[commands.length - 1].push(value);
+    if (ends) commands.push([]);
   }
   const devCommands = commands.filter(command => DEV_PATTERN.test(command.join(' ')));
   return devCommands.length > 0 && devCommands.every(command => TMUX_PANE_COMMANDS.has(command[0]));
