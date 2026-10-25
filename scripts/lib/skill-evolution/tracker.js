@@ -35,8 +35,8 @@ function toNullableNumber(value, fieldName) {
   }
 
   const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) {
-    throw new Error(`${fieldName} must be a number`);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    throw new Error(`${fieldName} must be a number greater than or equal to zero`);
   }
 
   return numericValue;

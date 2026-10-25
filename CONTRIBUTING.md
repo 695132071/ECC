@@ -15,6 +15,9 @@ Thanks for wanting to contribute! This repo is a community resource for Claude C
 - [Cross-Harness and Translations](#cross-harness-and-translations)
 - [Pull Request Process](#pull-request-process)
 - [Releases](#releases)
+- [Guidelines](#guidelines)
+- [File Naming](#file-naming)
+- [Questions?](#questions)
 
 ---
 
