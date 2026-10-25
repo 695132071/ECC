@@ -92,6 +92,14 @@ function skipJsoncTrivia(input, start) {
   }
 }
 
+function isJsoncTrailingComma(input, index, previousSignificant) {
+  const next = skipJsoncTrivia(input, index + 1);
+  // Preserve commas in empty containers or after another separator so
+  // JSON.parse rejects them; it validates the remaining value syntax.
+  return (input[next] === '}' || input[next] === ']')
+    && previousSignificant !== null && !'[{,:'.includes(previousSignificant);
+}
+
 /**
  * Strip // and /* *\/ comments and the trailing commas they hide, without
  * touching string contents (URLs like "https://..." must survive intact).
@@ -100,6 +108,7 @@ function stripJsonc(input) {
   let out = '';
   let inString = false;
   let escaped = false;
+  let previousSignificant = null;
   for (let i = 0; i < input.length; i += 1) {
     const ch = input[i];
     if (inString) {
@@ -112,6 +121,7 @@ function stripJsonc(input) {
     if (ch === '"') {
       inString = true;
       out += ch;
+      previousSignificant = '"';
       continue;
     }
     if (ch === '/' && input[i + 1] === '/') {
@@ -128,12 +138,10 @@ function stripJsonc(input) {
       continue;
     }
     if (ch === ',') {
-      const next = skipJsoncTrivia(input, i + 1);
-      // A comma before '}' or ']' (ignoring trivia) is a trailing comma
-      // JSON forbids.
-      if (input[next] === '}' || input[next] === ']') continue;
+      if (isJsoncTrailingComma(input, i, previousSignificant)) continue;
     }
     out += ch;
+    if (!/\s/.test(ch)) previousSignificant = ch;
   }
   return out;
 }
