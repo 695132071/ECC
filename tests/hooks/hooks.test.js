@@ -233,6 +233,14 @@ function createTestDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'hooks-test-'));
 }
 
+function fixtureGitOptions(cwd) {
+  const env = { ...process.env };
+  for (const name of Object.keys(env)) {
+    if (name.toUpperCase().startsWith('GIT_')) delete env[name];
+  }
+  return { cwd, env };
+}
+
 // Clean up test directory
 function cleanupTestDir(testDir) {
   const retryableCodes = new Set(['EPERM', 'EBUSY', 'ENOTEMPTY']);
@@ -1208,10 +1216,10 @@ async function runTests() {
       try {
         const appDir = path.join(repo, 'packages', 'app');
         fs.mkdirSync(path.join(appDir, 'src'), { recursive: true });
-        execFileSync('git', ['init', '-q'], { cwd: repo });
+        execFileSync('git', ['init', '-q'], fixtureGitOptions(repo));
         fs.writeFileSync(path.join(appDir, 'src', 'a.ts'), 'export const a = 1;\n');
-        execFileSync('git', ['add', '-A'], { cwd: repo });
-        execFileSync('git', ['-c', 'user.email=t@t.local', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'seed'], { cwd: repo });
+        execFileSync('git', ['add', '-A'], fixtureGitOptions(repo));
+        execFileSync('git', ['-c', 'user.email=t@t.local', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'seed'], fixtureGitOptions(repo));
         fs.writeFileSync(path.join(appDir, 'src', 'a.ts'), 'export const a = 1;\nconsole.log(a);\n');
 
         const result = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', {}, appDir);
@@ -1219,7 +1227,7 @@ async function runTests() {
         assert.ok(result.stderr.includes('console.log found in packages/app/src/a.ts'), `Should warn about the file, got: ${result.stderr}`);
 
         // diff.relative would make git report paths from the session's directory.
-        execFileSync('git', ['config', 'diff.relative', 'true'], { cwd: repo });
+        execFileSync('git', ['config', 'diff.relative', 'true'], fixtureGitOptions(repo));
         const relative = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', {}, appDir);
         assert.ok(relative.stderr.includes('console.log found in packages/app/src/a.ts'), `Should warn with diff.relative, got: ${relative.stderr}`);
       } finally {
@@ -1237,10 +1245,10 @@ async function runTests() {
         const makeRepo = (name, file) => {
           const repo = path.join(root, name);
           fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
-          execFileSync('git', ['init', '-q'], { cwd: repo });
+          execFileSync('git', ['init', '-q'], fixtureGitOptions(repo));
           fs.writeFileSync(path.join(repo, 'src', file), 'export const value = 1;\n');
-          execFileSync('git', ['add', '-A'], { cwd: repo });
-          execFileSync('git', ['-c', 'user.email=t@t.local', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'seed'], { cwd: repo });
+          execFileSync('git', ['add', '-A'], fixtureGitOptions(repo));
+          execFileSync('git', ['-c', 'user.email=t@t.local', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'seed'], fixtureGitOptions(repo));
           return repo;
         };
         const sessionRepo = makeRepo('session', 'local.ts');
