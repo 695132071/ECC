@@ -1201,6 +1201,35 @@ async function runTests() {
     passed++;
   else failed++;
 
+  if (
+    await asyncTest('finds console.log in a modified file when the session runs in a subdirectory', async () => {
+      // git reports paths from the repository root, not from the session's directory.
+      const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ecc-console-log-'));
+      try {
+        const appDir = path.join(repo, 'packages', 'app');
+        fs.mkdirSync(path.join(appDir, 'src'), { recursive: true });
+        execFileSync('git', ['init', '-q'], { cwd: repo });
+        fs.writeFileSync(path.join(appDir, 'src', 'a.ts'), 'export const a = 1;\n');
+        execFileSync('git', ['add', '-A'], { cwd: repo });
+        execFileSync('git', ['-c', 'user.email=t@t.local', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'seed'], { cwd: repo });
+        fs.writeFileSync(path.join(appDir, 'src', 'a.ts'), 'export const a = 1;\nconsole.log(a);\n');
+
+        const result = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', {}, appDir);
+        assert.strictEqual(result.code, 0);
+        assert.ok(result.stderr.includes('console.log found in packages/app/src/a.ts'), `Should warn about the file, got: ${result.stderr}`);
+
+        // diff.relative would make git report paths from the session's directory.
+        execFileSync('git', ['config', 'diff.relative', 'true'], { cwd: repo });
+        const relative = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', {}, appDir);
+        assert.ok(relative.stderr.includes('console.log found in packages/app/src/a.ts'), `Should warn with diff.relative, got: ${relative.stderr}`);
+      } finally {
+        fs.rmSync(repo, { recursive: true, force: true });
+      }
+    })
+  )
+    passed++;
+  else failed++;
+
   // session-end.js tests
   console.log('\nsession-end.js:');
 

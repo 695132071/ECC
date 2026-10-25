@@ -14,7 +14,8 @@
  */
 
 const fs = require('fs');
-const { isGitRepo, getGitModifiedFiles, readFile, log } = require('../lib/utils');
+const path = require('path');
+const { isGitRepo, getGitModifiedFiles, readFile, log, runCommand } = require('../lib/utils');
 
 // Files where console.log is expected and should not trigger warnings
 const EXCLUDED_PATTERNS = [
@@ -66,14 +67,17 @@ process.stdin.on('end', () => {
       return;
     }
 
+    // git reports paths from the repository root, and the session can run in a
+    // subdirectory of it, so read each file from the root.
+    const root = runCommand('git rev-parse --show-toplevel').output;
     const files = getGitModifiedFiles(['\\.tsx?$', '\\.jsx?$'])
-      .filter(f => fs.existsSync(f))
+      .filter(f => fs.existsSync(path.join(root, f)))
       .filter(f => !EXCLUDED_PATTERNS.some(pattern => pattern.test(f)));
 
     let hasConsole = false;
 
     for (const file of files) {
-      const content = readFile(file);
+      const content = readFile(path.join(root, file));
       if (content && content.includes('console.log')) {
         log(`[Hook] WARNING: console.log found in ${file}`);
         hasConsole = true;

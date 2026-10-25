@@ -552,7 +552,8 @@ function isGitRepo() {
 function getGitModifiedFiles(patterns = []) {
   if (!isGitRepo()) return [];
 
-  const result = runCommand('git diff --name-only HEAD');
+  // Paths from the repository root even when diff.relative is set.
+  const result = runCommand('git -c diff.relative=false diff --name-only HEAD');
   if (!result.success) return [];
 
   let files = result.output.split('\n').filter(Boolean);
