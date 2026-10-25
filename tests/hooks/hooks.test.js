@@ -1230,6 +1230,45 @@ async function runTests() {
     passed++;
   else failed++;
 
+  if (
+    await asyncTest('uses the session repository despite inherited Git environment overrides', async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ecc-console-git-env-'));
+      try {
+        const makeRepo = (name, file) => {
+          const repo = path.join(root, name);
+          fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
+          execFileSync('git', ['init', '-q'], { cwd: repo });
+          fs.writeFileSync(path.join(repo, 'src', file), 'export const value = 1;\n');
+          execFileSync('git', ['add', '-A'], { cwd: repo });
+          execFileSync('git', ['-c', 'user.email=t@t.local', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'seed'], { cwd: repo });
+          return repo;
+        };
+        const sessionRepo = makeRepo('session', 'local.ts');
+        const foreignRepo = makeRepo('foreign', 'foreign.ts');
+        fs.writeFileSync(path.join(foreignRepo, 'src', 'foreign.ts'), 'console.log("foreign");\n');
+        const env = {
+          GIT_DIR: path.join(foreignRepo, '.git'),
+          GIT_WORK_TREE: foreignRepo,
+          GIT_INDEX_FILE: path.join(foreignRepo, '.git', 'index')
+        };
+
+        const clean = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', env, sessionRepo);
+        assert.strictEqual(clean.code, 0);
+        assert.ok(!clean.stderr.includes('console.log found'), `foreign repository leaked into hook: ${clean.stderr}`);
+
+        fs.writeFileSync(path.join(sessionRepo, 'src', 'local.ts'), 'console.log("local");\n');
+        const local = await runScript(path.join(scriptsDir, 'check-console-log.js'), '{}', env, sessionRepo);
+        assert.strictEqual(local.code, 0);
+        assert.ok(local.stderr.includes('console.log found in src/local.ts'), local.stderr);
+        assert.ok(!local.stderr.includes('foreign.ts'), local.stderr);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    })
+  )
+    passed++;
+  else failed++;
+
   // session-end.js tests
   console.log('\nsession-end.js:');
 

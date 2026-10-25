@@ -28,6 +28,18 @@ const EXCLUDED_PATTERNS = [
 ];
 
 const MAX_DIRECT_STDIN_BYTES = 16 * 1024 * 1024;
+
+// This Stop hook inspects the session's working directory. Inherited GIT_*
+// variables from another Git process can silently redirect discovery and diff
+// commands to a different repository, so give every Git call the same clean env.
+function sessionGitOptions() {
+  const env = { ...process.env };
+  for (const name of Object.keys(env)) {
+    if (name.toUpperCase().startsWith('GIT_')) delete env[name];
+  }
+  return { env };
+}
+
 let data = '';
 let stdinBytes = 0;
 let oversized = false;
@@ -62,15 +74,16 @@ function passThroughAndExit() {
 
 process.stdin.on('end', () => {
   try {
-    if (!isGitRepo()) {
+    const gitOptions = sessionGitOptions();
+    if (!isGitRepo(gitOptions)) {
       passThroughAndExit();
       return;
     }
 
     // git reports paths from the repository root, and the session can run in a
     // subdirectory of it, so read each file from the root.
-    const root = runCommand('git rev-parse --show-toplevel').output;
-    const files = getGitModifiedFiles(['\\.tsx?$', '\\.jsx?$'])
+    const root = runCommand('git rev-parse --show-toplevel', gitOptions).output;
+    const files = getGitModifiedFiles(['\\.tsx?$', '\\.jsx?$'], gitOptions)
       .filter(f => fs.existsSync(path.join(root, f)))
       .filter(f => !EXCLUDED_PATTERNS.some(pattern => pattern.test(f)));
 
