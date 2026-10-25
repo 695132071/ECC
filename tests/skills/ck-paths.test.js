@@ -79,7 +79,7 @@ async function runTests() {
       assert.ok(additionalContext.includes('# ck — Context Keeper'), 'SKILL.md was not injected');
       assert.ok(!additionalContext.includes('${CLAUDE_SKILL_DIR}'), 'skill dir placeholder left unexpanded');
       // Escaped for double-quoted bash (Windows backslashes are doubled).
-      const shellCommandsDir = path.join(SKILL_DIR, 'commands').replace(/[\\$`"]/g, '\\$&');
+      const shellCommandsDir = `${SKILL_DIR.replace(/[\\$`"]/g, '\\$&')}/commands`;
       assert.ok(additionalContext.includes(shellCommandsDir), 'skill dir not substituted');
     } finally {
       fs.rmSync(ctx.root, { recursive: true, force: true });

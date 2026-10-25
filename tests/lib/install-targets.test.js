@@ -66,7 +66,7 @@ function runTests() {
 
   if (test('resolves claude adapter root and install-state path from home dir', () => {
     const adapter = getInstallTargetAdapter('claude');
-    const homeDir = '/Users/example';
+    const homeDir = path.resolve('/Users/example');
     const root = adapter.resolveRoot({ homeDir, repoRoot: '/repo/ecc' });
     const statePath = adapter.getInstallStatePath({ homeDir, repoRoot: '/repo/ecc' });
 
@@ -163,7 +163,7 @@ function runTests() {
 
   if (test('plans namespaced Claude rules and flat discoverable skills', () => {
     const repoRoot = path.join(__dirname, '..', '..');
-    const homeDir = '/Users/example';
+    const homeDir = path.resolve('/Users/example');
 
     const plan = planInstallTargetScaffold({
       target: 'claude',
@@ -722,7 +722,7 @@ function runTests() {
 
   if (test('claude adapter falls back to home/.claude when CLAUDE_CONFIG_DIR is unset or blank', () => {
     const adapter = getInstallTargetAdapter('claude');
-    const homeDir = '/Users/example';
+    const homeDir = path.resolve('/Users/example');
 
     assert.strictEqual(
       adapter.resolveRoot({ homeDir, env: {} }),
