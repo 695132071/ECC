@@ -431,6 +431,13 @@ Translations live under `docs/` (e.g. `docs/zh-CN`, `docs/zh-TW`, `docs/ja-JP`).
 
 ---
 
+## Issue submission
+
+Please submit at most five Issues within any 20-minute period and keep at
+most ten Issues open at once. The [Issue moderation policy](.github/ISSUE_MODERATION.md)
+explains the automatic closure, reopening, and maintainer alert rules. Existing
+open Issues stay open when the policy takes effect.
+
 ## Pull Request Process
 
 ### Submission volume
